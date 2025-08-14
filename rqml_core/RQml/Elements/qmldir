@@ -1,0 +1,15 @@
+module RQml.Elements
+ChangeSlider 1.0 ChangeSlider.qml
+DecimalInputField 1.0 DecimalInputField.qml
+DecimalSpinBox 1.0 DecimalSpinBox.qml
+EditMessageDialog 1.0 EditMessageDialog.qml
+IconButton 1.0 IconButton.qml
+IconToggleButton 1.0 IconToggleButton.qml
+IntegerInputField 1.0 IntegerInputField.qml
+ListHeader 1.0 ListHeader.qml
+LoadingListView 1.0 LoadingListView.qml
+MessageContentEditor 1.0 MessageContentEditor.qml
+RefreshButton 1.0 RefreshButton.qml
+SpeedSlider 1.0 SpeedSlider.qml
+StateIndicator 1.0 StateIndicator.qml
+TruncatedLabel 1.0 TruncatedLabel.qml

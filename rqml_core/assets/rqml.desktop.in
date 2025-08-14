@@ -1,0 +1,9 @@
+[Desktop Entry]
+Encoding=UTF-8
+Version=1.0
+Type=Application
+Exec=/bin/bash -ic "rqml %u"
+Name=RQml
+Terminal=false
+StartupWMClass=rqml
+Icon=@CMAKE_INSTALL_PREFIX@/share/rqml_core/app_icon.svg

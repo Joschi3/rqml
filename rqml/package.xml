@@ -1,0 +1,18 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>rqml</name>
+  <version>0.0.0</version>
+  <description>QML-based robotics visualization and control tool for ROS 2.</description>
+
+  <maintainer email="fabian@sim.tu-darmstadt.de">Stefan Fabian</maintainer>
+  <license>GPLv3</license>
+  <author email="fabian@sim.tu-darmstadt.de">Stefan Fabian</author>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+  <exec_depend>rqml_core</exec_depend>
+  <exec_depend>rqml_default_plugins</exec_depend>
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>

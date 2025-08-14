@@ -1,0 +1,2 @@
+module RQml.Fonts
+singleton IconFont 1.0 IconFont.qml

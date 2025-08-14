@@ -1,0 +1,6 @@
+plugins:
+  - id: rqml_plugin_example.example_plugin
+    name: "Example Plugin"
+    group: "Examples"  # Prefer to use already commonly used groups unless necessary
+    path: "share/@PROJECT_NAME@/qml/ExamplePlugin.qml"
+    single_instance: false  # Rarely needed, typically should be users choice

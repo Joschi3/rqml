@@ -1,0 +1,34 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>rqml_core</name>
+  <version>0.0.0</version>
+  <description>QML-based robotics visualization and control tool for ROS 2.</description>
+
+  <maintainer email="fabian@sim.tu-darmstadt.de">Stefan Fabian</maintainer>
+  <license>GPLv3</license>
+  <author email="fabian@sim.tu-darmstadt.de">Stefan Fabian</author>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+  <build_depend>nlohmann-json-dev</build_depend>
+  <build_depend>qt6-base-dev</build_depend>
+  <build_depend>qt6-base-private-dev</build_depend>
+  <build_depend>qt6-declarative-dev</build_depend>
+  <build_depend>qt6-declarative-private-dev</build_depend>
+  <depend>ament_index_cpp</depend>
+  <depend>libqt6-core</depend>
+  <depend>libqt6-qml</depend>
+  <depend>libqt6-quick</depend>
+  <depend>qml6_ros2_plugin</depend>
+  <depend>yaml_cpp_vendor</depend>
+  <exec_depend>qml6-module-qtcore</exec_depend>
+  <exec_depend>qml6-module-qtqml-models</exec_depend>
+  <exec_depend>qml6-module-qtqml-workerscript</exec_depend>
+  <exec_depend>qml6-module-qtquick-controls</exec_depend>
+  <exec_depend>qml6-module-qtquick-layouts</exec_depend>
+  <exec_depend>qml6-module-qtquick-templates</exec_depend>
+  <exec_depend>qml6-module-qtquick-window</exec_depend>
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>

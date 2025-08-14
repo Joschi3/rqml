@@ -1,0 +1,24 @@
+import QtQuick
+import QtQuick.Controls
+import QtQuick.Controls.Material
+
+Rectangle {
+    //! possible values: "unconfigured", "inactive", "active", "unloaded", "unknown"
+    property string state: "unknown"
+    height: Math.min(16, parent.height - 8)
+    width: height
+    radius: height / 2
+    color: {
+        if (state === "active")
+            return Material.color(Material.Green);
+        if (state === "inactive")
+            return Material.color(Material.Blue);
+        if (state === "unconfigured")
+            return Material.color(Material.Orange);
+        if (state === "unloaded")
+            return Material.color(Material.Grey);
+        if (state == "unknown")
+            return Material.color(Material.Purple);
+        return Material.color(Material.Red);
+    }
+}
