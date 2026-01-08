@@ -88,6 +88,7 @@ If you want to contribute or need the absolute latest changes, you can build fro
    cd ~/ros2_ws
    rosdep install --from-paths src --ignore-src -r -y
    ```
+   You might alternatively want to install [QML6 ROS2 Plugin](https://github.com/StefanFabian/qml6_ros2_plugin) from source to get the latest fixes.
 
 4. **Build the workspace**:
    ```bash
