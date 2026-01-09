@@ -1,3 +1,8 @@
+[![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=StefanFabian_rqml&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=StefanFabian_rqml)
+[![Maintainability Rating](https://sonarcloud.io/api/project_badges/measure?project=StefanFabian_rqml&metric=sqale_rating)](https://sonarcloud.io/summary/new_code?id=StefanFabian_rqml)
+[![Reliability Rating](https://sonarcloud.io/api/project_badges/measure?project=StefanFabian_rqml&metric=reliability_rating)](https://sonarcloud.io/summary/new_code?id=StefanFabian_rqml)
+[![Security Rating](https://sonarcloud.io/api/project_badges/measure?project=StefanFabian_rqml&metric=security_rating)](https://sonarcloud.io/summary/new_code?id=StefanFabian_rqml)
+
 ![image](docs/images/header_image.png)
 
 **RQml** is your modern, QML-based robotics visualization and control toolbox for ROS 2! 🚀
