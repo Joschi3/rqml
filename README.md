@@ -21,6 +21,10 @@ Alternatively, donations are always welcome :)
 * 🪟 **Docking Interface**: Flexible layout management with KDDockWidgets.
 * 🧰 **Default Plugins**: Comes with a suite of essential tools for robotics development.
 
+## 🎬 Demo Video
+
+https://github.com/user-attachments/assets/dc21676b-ed8f-4aa1-accd-fd5f4f7adeb0
+
 ## 📦 Installation
 
 The easiest way to get started is to install RQml directly from the ROS buildfarm! **(Coming soon)**
