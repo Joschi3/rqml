@@ -89,15 +89,18 @@ If you want to contribute or need the absolute latest changes, you can build fro
 
 2. **Clone the repository**:
    ```bash
-   git clone https://github.com/tu-darmstadt-ros-pkg/rqml.git
+   git clone https://github.com/StefanFabian/qml6_ros2_plugin.git -b $ROS_DISTRO
+   git clone https://github.com/StefanFabian/rqml.git
    ```
+   This clones both this repository and the main dependency [QML6 ROS2 Plugin](https://github.com/StefanFabian/qml6_ros2_plugin).
+   Currently, this plugin is not yet available on all distros.
+   If it is available on yours, you may omit it but it could still be useful when developing.
 
 3. **Install dependencies** (using rosdep):
    ```bash
    cd ~/ros2_ws
    rosdep install --from-paths src --ignore-src -r -y
    ```
-   You might alternatively want to install [QML6 ROS2 Plugin](https://github.com/StefanFabian/qml6_ros2_plugin) from source to get the latest fixes.
 
 4. **Build the workspace**:
    ```bash
