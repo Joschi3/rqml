@@ -2,10 +2,10 @@ name: Lint, Build & Test
 on:
   push:
     branches:
-      - main
+      - rolling
   pull_request:
     branches:
-      - main
+      - rolling
 defaults:
   run:
     shell: bash
