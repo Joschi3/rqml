@@ -6,7 +6,7 @@
   <description>Default plugins for the QML-based robotics visualization and control tool RQml for ROS 2.</description>
 
   <maintainer email="fabian@sim.tu-darmstadt.de">Stefan Fabian</maintainer>
-  <license>GPLv3</license>
+  <license>GPL-3.0-only</license>
   <author email="fabian@sim.tu-darmstadt.de">Stefan Fabian</author>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
