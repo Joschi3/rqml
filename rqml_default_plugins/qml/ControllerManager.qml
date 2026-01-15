@@ -41,7 +41,7 @@ Rectangle {
             model: d.controllerManagers
 
             onCurrentValueChanged: {
-                if (!currentValue)
+                if (!currentValue || currentValue === context.controller_manager_namespace)
                     return;
                 context.controller_manager_namespace = currentValue;
             }
@@ -97,13 +97,6 @@ Rectangle {
                         }
                         return result + padding * 2;
                     }
-                    Action {
-                        text: qsTr("Show Info")
-                        onTriggered: {
-                            controllerInfoDialog.openControllerInfo(controller);
-                        }
-                    }
-                    MenuSeparator {}
                     Instantiator {
                         model: d.getTransitionsForControllerState(controller.state)
 
@@ -113,8 +106,15 @@ Rectangle {
                                 d.controllerManager.transitionController(controller.name, modelData.actions);
                             }
                         }
-                        onObjectAdded: (index, object) => contextMenu.insertItem(index + 2, object)
+                        onObjectAdded: (index, object) => contextMenu.insertItem(index, object)
                         onObjectRemoved: (index, object) => contextMenu.removeItem(object)
+                    }
+                    MenuSeparator {}
+                    Action {
+                        text: qsTr("Show Info")
+                        onTriggered: {
+                            controllerInfoDialog.openControllerInfo(controller);
+                        }
                     }
                 }
 
@@ -193,13 +193,6 @@ Rectangle {
                         }
                         return result + padding * 2;
                     }
-                    Action {
-                        text: qsTr("Show Info")
-                        onTriggered: {
-                            hardwareComponentInfoDialog.openHardwareComponentInfo(hardwareComponent);
-                        }
-                    }
-                    MenuSeparator {}
                     Instantiator {
                         model: d.getTransitionsForHardwareComponentState(hardwareComponent.state.label)
 
@@ -209,8 +202,15 @@ Rectangle {
                                 d.controllerManager.transitionHardwareComponent(hardwareComponent.name, modelData.target_state);
                             }
                         }
-                        onObjectAdded: (index, object) => contextMenu.insertItem(index + 2, object)
+                        onObjectAdded: (index, object) => contextMenu.insertItem(index, object)
                         onObjectRemoved: (index, object) => contextMenu.removeItem(object)
+                    }
+                    MenuSeparator {}
+                    Action {
+                        text: qsTr("Show Info")
+                        onTriggered: {
+                            hardwareComponentInfoDialog.openHardwareComponentInfo(hardwareComponent);
+                        }
                     }
                 }
 
