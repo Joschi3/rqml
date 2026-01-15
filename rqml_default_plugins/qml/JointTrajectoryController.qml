@@ -8,7 +8,7 @@ import "interfaces"
 Rectangle {
     id: root
     anchors.fill: parent
-    property var kddockwidgets_min_size: Qt.size(350, 500)
+    property var kddockwidgets_min_size: Qt.size(480, 360)
     color: palette.base
 
     Component.onCompleted: {
@@ -118,6 +118,7 @@ Rectangle {
         }
 
         Switch {
+            Layout.columnSpan: 3
             text: "Use shortest path duration for continuous joints"
             checked: context.take_shortest_path || false
             onCheckedChanged: context.take_shortest_path = checked
