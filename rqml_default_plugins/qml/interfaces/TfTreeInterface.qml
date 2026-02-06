@@ -1,20 +1,3 @@
-/*
- * Copyright (C) 2025  Stefan Fabian
- *
- * This program is free software: you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation, either version 3 of the License, or
- *  (at your option) any later version.
- *
- *  This program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
- */
-
 import QtQuick
 import Ros2
 import RQml.Utils
@@ -56,13 +39,7 @@ Object {
      * Also triggers re-subscription to receive transient_local messages again.
      */
     function clear() {
-        d.frameData = {};
-        d.frameIds = [];
-        d.staticFrames = {};
-        root.frames.clear();
-        root.rootFrames = [];
-        root.frameCount = 0;
-        root.treeChanged();
+        d.resetData();
         // Force re-subscription to receive transient_local static transforms
         d.triggerResubscribe();
     }
@@ -82,21 +59,25 @@ Object {
         return frame ? frame.children : [];
     }
 
+    /**
+     * Toggle the collapsed state of a frame in the list view.
+     */
+    function toggleCollapse(frameId) {
+        if (d.collapsedFrames[frameId]) {
+            delete d.collapsedFrames[frameId];
+        } else {
+            d.collapsedFrames[frameId] = true;
+        }
+        d.rebuildModel();
+    }
+
     // ========================================================================
     // Namespace Change Handling
     // ========================================================================
 
     onNamespaceChanged: {
-        // Clear data - this also triggers re-subscription
-        d.frameData = {};
-        d.frameIds = [];
-        d.staticFrames = {};
-        root.frames.clear();
-        root.rootFrames = [];
-        root.frameCount = 0;
-        root.treeChanged();
-        // Note: Subscription topics will update automatically via binding
-        // and the transient_local messages will be received on the new topic
+        // Reset data without triggering re-subscription (topic bindings handle that)
+        d.resetData();
     }
 
     // ========================================================================
@@ -109,11 +90,29 @@ Object {
         property var frameData: ({})
         property var frameIds: []
         property var staticFrames: ({})
-        property var frameToModelIndex: ({})  // Maps frameId to model index
-        property bool structureChanged: false
+        property var collapsedFrames: ({})  // Tracks which frames are collapsed in list view
+        property var frameToModelIndex: ({})  // Maps frameId to model index for in-place updates
 
         //! Flag to temporarily disable static subscription for re-subscription
         property bool resubscribing: false
+
+        // Frequency calculation constants
+        readonly property int frequencyWindowMs: 3000      // Sliding window duration for frequency calculation
+        readonly property int frequencyMinSamplesMs: 500   // Minimum elapsed time before reporting frequency
+
+        /**
+         * Reset all internal data structures.
+         */
+        function resetData() {
+            d.frameData = {};
+            d.frameIds = [];
+            d.staticFrames = {};
+            d.frameToModelIndex = {};
+            root.frames.clear();
+            root.rootFrames = [];
+            root.frameCount = 0;
+            root.treeChanged();
+        }
 
         /**
          * Force re-subscription by briefly disabling and re-enabling the subscription.
@@ -163,7 +162,11 @@ Object {
                         isStatic: isStatic,
                         children: [],
                         lastUpdate: now,
+                        frequency: 0,
                         updateCount: 1,
+                        // Sliding window for frequency calculation (3 second window)
+                        frequencyWindowStart: now,
+                        frequencyWindowCount: 1,
                         translation: {
                             x: tf.transform.translation.x,
                             y: tf.transform.translation.y,
@@ -189,6 +192,20 @@ Object {
                                 oldParent.children.splice(idx, 1);
                             }
                         }
+                    }
+
+                    // Calculate frequency using sliding window
+                    frame.frequencyWindowCount++;
+                    const windowElapsed = now - frame.frequencyWindowStart;
+
+                    if (windowElapsed >= d.frequencyWindowMs) {
+                        // Calculate frequency from window and reset
+                        frame.frequency = (frame.frequencyWindowCount - 1) / (windowElapsed / 1000.0);
+                        frame.frequencyWindowStart = now;
+                        frame.frequencyWindowCount = 1;
+                    } else if (windowElapsed > d.frequencyMinSamplesMs && frame.frequencyWindowCount > 2) {
+                        // Update frequency estimate after minimum elapsed time and 2 samples
+                        frame.frequency = (frame.frequencyWindowCount - 1) / (windowElapsed / 1000.0);
                     }
 
                     frame.parentId = parentFrame;
@@ -222,7 +239,10 @@ Object {
                         isStatic: false,
                         children: [],
                         lastUpdate: 0,
+                        frequency: 0,
                         updateCount: 0,
+                        frequencyWindowStart: 0,
+                        frequencyWindowCount: 0,
                         translation: { x: 0, y: 0, z: 0 },
                         rotation: { x: 0, y: 0, z: 0, w: 1 }
                     };
@@ -257,6 +277,7 @@ Object {
 
             root.frames.setProperty(idx, "lastUpdate", frame.lastUpdate);
             root.frames.setProperty(idx, "age", age);
+            root.frames.setProperty(idx, "frequency", frame.frequency);
             root.frames.setProperty(idx, "updateCount", frame.updateCount);
             root.frames.setProperty(idx, "isStatic", frame.isStatic);
             root.frames.setProperty(idx, "translationX", frame.translation.x);
@@ -297,6 +318,7 @@ Object {
 
             const now = Date.now();
             const age = frame.lastUpdate > 0 ? (now - frame.lastUpdate) / 1000.0 : -1;
+            const isCollapsed = d.collapsedFrames[frameId] === true;
 
             d.frameToModelIndex[frameId] = root.frames.count;
             root.frames.append({
@@ -305,9 +327,10 @@ Object {
                 depth: depth,
                 isStatic: frame.isStatic,
                 hasChildren: frame.children.length > 0,
-                childCount: frame.children.length,
+                isCollapsed: isCollapsed,
                 lastUpdate: frame.lastUpdate,
                 age: age,
+                frequency: frame.frequency,
                 updateCount: frame.updateCount,
                 translationX: frame.translation.x,
                 translationY: frame.translation.y,
@@ -317,6 +340,10 @@ Object {
                 rotationZ: frame.rotation.z,
                 rotationW: frame.rotation.w
             });
+
+            // Skip children if this frame is collapsed
+            if (isCollapsed)
+                return;
 
             const children = frame.children.slice().sort();
             for (let i = 0; i < children.length; ++i) {

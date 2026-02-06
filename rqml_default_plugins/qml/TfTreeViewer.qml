@@ -28,6 +28,16 @@ Rectangle {
     }
 
     // ========================================================================
+    // Constants
+    // ========================================================================
+
+    //! Indentation per tree depth level in pixels
+    readonly property int indentPerLevel: 16
+
+    //! Age threshold (in seconds) after which a dynamic transform is considered stale
+    readonly property real staleThreshold: 5.0
+
+    // ========================================================================
     // Private Data
     // ========================================================================
 
@@ -122,9 +132,24 @@ Rectangle {
                 return "#888888"; // Unknown
             if (age < 1)
                 return "#2ecc71"; // Fresh (green)
-            if (age < 5)
+            if (age < root.staleThreshold)
                 return "#f39c12"; // Warning (orange)
             return "#e74c3c"; // Stale (red)
+        }
+
+        /**
+         * Format frequency value for display.
+         */
+        function formatFrequency(freq, isStatic) {
+            if (isStatic)
+                return "static";
+            if (freq <= 0)
+                return "-";
+            if (freq < 1)
+                return freq.toFixed(2) + " Hz";
+            if (freq < 10)
+                return freq.toFixed(1) + " Hz";
+            return freq.toFixed(0) + " Hz";
         }
     }
 
@@ -242,6 +267,7 @@ Rectangle {
             TfGraphView {
                 id: graphView
                 tfInterface: d.tfInterface
+                staleThreshold: root.staleThreshold
             }
 
             // List View
@@ -267,7 +293,7 @@ Rectangle {
                     RowLayout {
                         anchors.fill: parent
                         anchors.leftMargin: 8
-                        anchors.rightMargin: 8
+                        anchors.rightMargin: 20
                         spacing: 0
 
                         Label {
@@ -279,7 +305,16 @@ Rectangle {
                         }
 
                         Label {
-                            Layout.preferredWidth: 70
+                            Layout.preferredWidth: 60
+                            height: parent.height
+                            text: "Freq"
+                            font.bold: true
+                            verticalAlignment: Text.AlignVCenter
+                            horizontalAlignment: Text.AlignRight
+                        }
+
+                        Label {
+                            Layout.preferredWidth: 60
                             height: parent.height
                             text: "Age"
                             font.bold: true
@@ -288,7 +323,7 @@ Rectangle {
                         }
 
                         Label {
-                            Layout.preferredWidth: 220
+                            Layout.preferredWidth: 200
                             Layout.rightMargin: 4
                             height: parent.height
                             text: "Transform"
@@ -311,7 +346,7 @@ Rectangle {
                     RowLayout {
                         anchors.fill: parent
                         anchors.leftMargin: 8
-                        anchors.rightMargin: 8
+                        anchors.rightMargin: 20
                         spacing: 0
 
                         // Frame column (fill available width)
@@ -321,18 +356,29 @@ Rectangle {
 
                             Row {
                                 anchors.fill: parent
-                                anchors.leftMargin: model.depth * 16
+                                anchors.leftMargin: model.depth * root.indentPerLevel
                                 spacing: 4
 
-                                // Tree branch indicator
+                                // Tree branch indicator (clickable for collapse/expand)
                                 Label {
                                     anchors.verticalCenter: parent.verticalCenter
-                                    text: model.hasChildren ? "\u25BC" : "\u2022"
+                                    // ▶ for collapsed (pointing right), ▼ for expanded (pointing down), • for leaf
+                                    text: model.hasChildren ? (model.isCollapsed ? "\u25B6" : "\u25BC") : "\u2022"
                                     font.pixelSize: model.hasChildren ? 10 : 8
-                                    color: palette.text
-                                    opacity: 0.6
-                                    width: 12
+                                    color: model.hasChildren ? palette.text : palette.mid
+                                    opacity: model.hasChildren ? 0.8 : 0.6
+                                    width: 16
                                     horizontalAlignment: Text.AlignHCenter
+
+                                    MouseArea {
+                                        anchors.fill: parent
+                                        anchors.margins: -4  // Larger click area
+                                        enabled: model.hasChildren
+                                        cursorShape: model.hasChildren ? Qt.PointingHandCursor : Qt.ArrowCursor
+                                        onClicked: {
+                                            d.tfInterface.toggleCollapse(model.frameId);
+                                        }
+                                    }
                                 }
 
                                 // Static indicator
@@ -357,7 +403,7 @@ Rectangle {
                                 // Frame name
                                 Label {
                                     anchors.verticalCenter: parent.verticalCenter
-                                    width: parent.width - 12 - 12 - model.depth * 16
+                                    width: parent.width - 16 - 12 - model.depth * root.indentPerLevel
                                     text: model.frameId
                                     elide: Text.ElideRight
 
@@ -373,9 +419,20 @@ Rectangle {
                             }
                         }
 
+                        // Frequency column (fixed width, right aligned)
+                        Label {
+                            Layout.preferredWidth: 60
+                            height: parent.height
+                            text: d.formatFrequency(model.frequency, model.isStatic)
+                            color: model.isStatic ? palette.mid : palette.text
+                            verticalAlignment: Text.AlignVCenter
+                            horizontalAlignment: Text.AlignRight
+                            font.pixelSize: 12
+                        }
+
                         // Age column (fixed width, right aligned)
                         Label {
-                            Layout.preferredWidth: 70
+                            Layout.preferredWidth: 60
                             height: parent.height
                             text: d.formatAge(model.age)
                             color: d.getAgeColor(model.age, model.isStatic)
@@ -385,7 +442,7 @@ Rectangle {
 
                         // Transform column (fixed width, right aligned)
                         Label {
-                            Layout.preferredWidth: 220
+                            Layout.preferredWidth: 200
                             Layout.rightMargin: 4
                             height: parent.height
                             text: model.updateCount > 0

@@ -13,9 +13,12 @@ Item {
     //! The TfTreeInterface providing frame data
     property var tfInterface: null
 
+    //! Age threshold (in seconds) after which a dynamic transform is considered stale
+    property real staleThreshold: 5.0
+
     //! Node styling
-    property color nodeColor: "#3498db"
-    property color staticNodeColor: "#9b59b6"
+    property color nodeColor: "#2ecc71"
+    property color staticNodeColor: "#3498db"
     property color nodeTextColor: "#ffffff"
     property color edgeColor: "#7f8c8d"
     property color staleNodeColor: "#e74c3c"
@@ -33,6 +36,8 @@ Item {
      */
     function fitToView() {
         if (d.nodePositions.length === 0)
+            return;
+        if (root.width <= 0 || root.height <= 0)
             return;
 
         // Find bounding box
@@ -64,14 +69,6 @@ Item {
         d.offsetX = -minX * d.scale + (root.width - (maxX - minX) * d.scale) / 2;
         d.offsetY = -minY * d.scale + (root.height - (maxY - minY) * d.scale) / 2;
 
-        canvas.requestPaint();
-    }
-
-    /**
-     * Reset zoom to 100%.
-     */
-    function resetZoom() {
-        d.scale = 1.0;
         canvas.requestPaint();
     }
 
@@ -198,11 +195,24 @@ Item {
         function getNodeColor(node) {
             if (node.updateCount === 0)
                 return "#95a5a6";  // Gray for nodes without data
-            if (!node.isStatic && node.age > 5)
+            if (!node.isStatic && node.age > root.staleThreshold)
                 return staleNodeColor;
             if (node.isStatic)
                 return staticNodeColor;
             return nodeColor;
+        }
+
+        /**
+         * Format age value for display.
+         */
+        function formatAge(age) {
+            if (age < 0)
+                return "N/A";
+            if (age < 1)
+                return (age * 1000).toFixed(0) + " ms";
+            if (age < 60)
+                return age.toFixed(1) + " s";
+            return (age / 60).toFixed(1) + " min";
         }
 
         /**
@@ -240,14 +250,10 @@ Item {
             const prevCount = d.nodePositions.length;
             d.calculateLayout();
             canvas.requestPaint();
-            // Auto-fit when frame count changes (new frames added)
+            // Auto-fit when new frames are added
             if (d.nodePositions.length > prevCount) {
                 root.fitToView();
             }
-        }
-        function onFrameCountChanged() {
-            d.calculateLayout();
-            canvas.requestPaint();
         }
     }
 
@@ -306,30 +312,35 @@ Item {
             ctx.translate(d.offsetX, d.offsetY);
             ctx.scale(d.scale, d.scale);
 
-            // Draw edges
+            // Draw edges with arrows
             ctx.strokeStyle = edgeColor;
             ctx.lineWidth = 2 / d.scale;
+            const arrowSize = 10;  // Fixed size in graph coordinates
+            const arrowWidth = arrowSize * 0.6;
+
             for (let i = 0; i < d.edges.length; ++i) {
                 const edge = d.edges[i];
+
+                // Arrow tip touches the node, arrow base is arrowSize above
+                const arrowTipY = edge.toY;
+                const arrowBaseY = edge.toY - arrowSize;
+
+                // Draw bezier curve ending at top of arrow (not at node)
                 ctx.beginPath();
                 ctx.moveTo(edge.fromX, edge.fromY);
-
-                // Bezier curve for smoother edges
-                const midY = (edge.fromY + edge.toY) / 2;
+                const midY = (edge.fromY + arrowBaseY) / 2;
                 ctx.bezierCurveTo(
                     edge.fromX, midY,
                     edge.toX, midY,
-                    edge.toX, edge.toY
+                    edge.toX, arrowBaseY
                 );
                 ctx.stroke();
 
-                // Draw arrow
-                const arrowSize = 8 / d.scale;
-                const angle = Math.atan2(edge.toY - midY, edge.toX - edge.toX);
+                // Draw arrow pointing downward
                 ctx.beginPath();
-                ctx.moveTo(edge.toX, edge.toY);
-                ctx.lineTo(edge.toX - arrowSize, edge.toY - arrowSize);
-                ctx.lineTo(edge.toX + arrowSize, edge.toY - arrowSize);
+                ctx.moveTo(edge.toX, arrowTipY);
+                ctx.lineTo(edge.toX - arrowWidth, arrowBaseY);
+                ctx.lineTo(edge.toX + arrowWidth, arrowBaseY);
                 ctx.closePath();
                 ctx.fillStyle = edgeColor;
                 ctx.fill();
@@ -369,9 +380,9 @@ Item {
                     ctx.stroke();
                 }
 
-                // Node text
+                // Node text (fixed size in graph coordinates, scales with zoom)
                 ctx.fillStyle = nodeTextColor;
-                ctx.font = "bold " + (12 / d.scale) + "px sans-serif";
+                ctx.font = "bold 12px sans-serif";
                 ctx.textAlign = "center";
                 ctx.textBaseline = "middle";
 
@@ -476,6 +487,11 @@ Item {
     Menu {
         id: nodeContextMenu
 
+        // Cache the selected frame to avoid repeated lookups
+        property var selectedFrame: d.selectedNode && root.tfInterface
+            ? root.tfInterface.getFrame(d.selectedNode)
+            : null
+
         Action {
             text: "Copy Frame ID"
             onTriggered: RQml.copyTextToClipboard(d.selectedNode)
@@ -483,14 +499,10 @@ Item {
 
         Action {
             text: "Copy Parent ID"
-            enabled: {
-                const frame = root.tfInterface ? root.tfInterface.getFrame(d.selectedNode) : null;
-                return frame && frame.parentId !== "";
-            }
+            enabled: nodeContextMenu.selectedFrame && nodeContextMenu.selectedFrame.parentId !== ""
             onTriggered: {
-                const frame = root.tfInterface.getFrame(d.selectedNode);
-                if (frame)
-                    RQml.copyTextToClipboard(frame.parentId);
+                if (nodeContextMenu.selectedFrame)
+                    RQml.copyTextToClipboard(nodeContextMenu.selectedFrame.parentId);
             }
         }
     }
@@ -505,6 +517,11 @@ Item {
         x: mouseArea.mouseX + 15
         y: mouseArea.mouseY + 15
 
+        // Cache the hovered frame to avoid repeated lookups
+        property var hoveredFrame: d.hoveredNode && root.tfInterface
+            ? root.tfInterface.getFrame(d.hoveredNode)
+            : null
+
         contentItem: Column {
             spacing: 4
 
@@ -514,28 +531,19 @@ Item {
             }
 
             Label {
-                visible: {
-                    const frame = root.tfInterface ? root.tfInterface.getFrame(d.hoveredNode) : null;
-                    return frame && frame.parentId !== "";
-                }
-                text: {
-                    const frame = root.tfInterface ? root.tfInterface.getFrame(d.hoveredNode) : null;
-                    return frame ? "Parent: " + frame.parentId : "";
-                }
+                visible: tooltip.hoveredFrame && tooltip.hoveredFrame.parentId !== ""
+                text: tooltip.hoveredFrame ? "Parent: " + tooltip.hoveredFrame.parentId : ""
                 font.pixelSize: 11
             }
 
             Label {
                 text: {
-                    const frame = root.tfInterface ? root.tfInterface.getFrame(d.hoveredNode) : null;
-                    if (!frame)
+                    if (!tooltip.hoveredFrame)
                         return "";
-                    if (frame.isStatic)
+                    if (tooltip.hoveredFrame.isStatic)
                         return "Static transform";
-                    const age = (Date.now() - frame.lastUpdate) / 1000.0;
-                    if (age < 1)
-                        return "Age: " + (age * 1000).toFixed(0) + " ms";
-                    return "Age: " + age.toFixed(1) + " s";
+                    const age = (Date.now() - tooltip.hoveredFrame.lastUpdate) / 1000.0;
+                    return "Age: " + d.formatAge(age);
                 }
                 font.pixelSize: 11
             }
@@ -618,7 +626,7 @@ Item {
             Row {
                 spacing: 8
                 Rectangle { width: 12; height: 12; radius: 2; color: staleNodeColor }
-                Label { text: "Stale (>5s)"; font.pixelSize: 11 }
+                Label { text: "Stale (>" + root.staleThreshold + "s)"; font.pixelSize: 11 }
             }
         }
     }
