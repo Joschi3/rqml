@@ -1,0 +1,450 @@
+import QtQuick
+import QtQuick.Controls
+import QtQuick.Layouts
+import Ros2
+import RQml.Elements
+import RQml.Fonts
+import "interfaces"
+import "elements"
+
+/**
+ * TF Tree Viewer plugin for visualizing the ROS 2 TF frame hierarchy.
+ * Supports both a list view (tree) and an interactive graph visualization.
+ */
+Rectangle {
+    id: root
+    anchors.fill: parent
+    property var kddockwidgets_min_size: Qt.size(400, 300)
+    color: palette.base
+
+    Component.onCompleted: {
+        if (context.enabled === undefined)
+            context.enabled = true;
+        if (!context.namespace)
+            context.namespace = "";
+        if (context.viewMode === undefined)
+            context.viewMode = "graph";  // Default to graph view
+        d.refresh();
+    }
+
+    // ========================================================================
+    // Private Data
+    // ========================================================================
+
+    QtObject {
+        id: d
+
+        property var namespaces: []
+        property var tfInterface: TfTreeInterface {
+            namespace: context.namespace || ""
+            enabled: context.enabled ?? true
+        }
+
+        /**
+         * Discover available TF namespaces by querying /tf topics.
+         */
+        function refresh() {
+            const prevNamespace = context.namespace;
+
+            // Query all tf topics
+            const tfTopics = Ros2.queryTopics("tf2_msgs/msg/TFMessage");
+            let namespaceSet = {};
+
+            for (let i = 0; i < tfTopics.length; ++i) {
+                const topic = tfTopics[i];
+                // Extract namespace from topic path
+                // /tf -> "" (global)
+                // /robot1/tf -> "/robot1"
+                // /ns1/ns2/tf -> "/ns1/ns2"
+                if (topic.endsWith("/tf") || topic.endsWith("/tf_static")) {
+                    let ns = "";
+                    if (topic !== "/tf" && topic !== "/tf_static") {
+                        const parts = topic.split("/");
+                        parts.pop(); // Remove "tf" or "tf_static"
+                        ns = parts.join("/");
+                    }
+                    namespaceSet[ns] = true;
+                }
+            }
+
+            // Convert to sorted array
+            let nsList = [];
+            for (let ns in namespaceSet) {
+                nsList.push(ns);
+            }
+            nsList.sort();
+
+            // Add "(global)" label for empty namespace
+            let displayList = [];
+            for (let i = 0; i < nsList.length; ++i) {
+                displayList.push(nsList[i] === "" ? "(global)" : nsList[i]);
+            }
+
+            d.namespaces = displayList;
+
+            // Restore previous selection
+            if (prevNamespace !== undefined) {
+                const displayNs = prevNamespace === "" ? "(global)" : prevNamespace;
+                const index = displayList.indexOf(displayNs);
+                if (index !== -1) {
+                    namespaceComboBox.currentIndex = index;
+                }
+            }
+        }
+
+        /**
+         * Convert display namespace back to actual namespace.
+         */
+        function displayToNamespace(display) {
+            return display === "(global)" ? "" : display;
+        }
+
+        /**
+         * Format age value for display.
+         */
+        function formatAge(age) {
+            if (age < 0)
+                return "N/A";
+            if (age < 1)
+                return (age * 1000).toFixed(0) + " ms";
+            if (age < 60)
+                return age.toFixed(1) + " s";
+            return (age / 60).toFixed(1) + " min";
+        }
+
+        /**
+         * Get color based on frame age (stale detection).
+         */
+        function getAgeColor(age, isStatic) {
+            if (isStatic)
+                return palette.text;
+            if (age < 0)
+                return "#888888"; // Unknown
+            if (age < 1)
+                return "#2ecc71"; // Fresh (green)
+            if (age < 5)
+                return "#f39c12"; // Warning (orange)
+            return "#e74c3c"; // Stale (red)
+        }
+    }
+
+    // ========================================================================
+    // UI Layout
+    // ========================================================================
+
+    ColumnLayout {
+        anchors.fill: parent
+        anchors.margins: 8
+        spacing: 8
+
+        // --------------------------------------------------------------------
+        // Header Row: Namespace Selection
+        // --------------------------------------------------------------------
+
+        RowLayout {
+            Layout.fillWidth: true
+            spacing: 8
+
+            Label {
+                text: "Namespace:"
+            }
+
+            ComboBox {
+                id: namespaceComboBox
+                Layout.fillWidth: true
+                model: d.namespaces
+
+                onCurrentTextChanged: {
+                    if (!currentText)
+                        return;
+                    const ns = d.displayToNamespace(currentText);
+                    if (ns === context.namespace)
+                        return;
+                    context.namespace = ns;
+                }
+            }
+
+            RefreshButton {
+                onClicked: {
+                    animate = true;
+                    d.refresh();
+                    animate = false;
+                }
+            }
+        }
+
+        // --------------------------------------------------------------------
+        // Toolbar Row: Controls
+        // --------------------------------------------------------------------
+
+        RowLayout {
+            Layout.fillWidth: true
+            spacing: 8
+
+            Label {
+                text: "Frames: " + d.tfInterface.frameCount
+                font.bold: true
+            }
+
+            Item { Layout.fillWidth: true }
+
+            // View mode toggle
+            ButtonGroup {
+                id: viewModeGroup
+            }
+
+            Button {
+                text: "Graph"
+                checkable: true
+                checked: context.viewMode === "graph"
+                ButtonGroup.group: viewModeGroup
+                onClicked: context.viewMode = "graph"
+            }
+
+            Button {
+                text: "List"
+                checkable: true
+                checked: context.viewMode === "list"
+                ButtonGroup.group: viewModeGroup
+                onClicked: context.viewMode = "list"
+            }
+
+            Item { width: 8 }
+
+            IconToggleButton {
+                iconOn: IconFont.iconPause
+                iconOff: IconFont.iconPlay
+                tooltipTextOn: "Click to pause"
+                tooltipTextOff: "Click to resume"
+                checked: context.enabled ?? true
+                onToggled: {
+                    context.enabled = checked;
+                }
+            }
+
+            IconButton {
+                text: IconFont.iconTrash
+                tooltipText: "Clear all data"
+                onClicked: d.tfInterface.clear()
+            }
+        }
+
+        // --------------------------------------------------------------------
+        // Main Content: Graph or List View
+        // --------------------------------------------------------------------
+
+        StackLayout {
+            Layout.fillWidth: true
+            Layout.fillHeight: true
+            currentIndex: context.viewMode === "graph" ? 0 : 1
+
+            // Graph View
+            TfGraphView {
+                id: graphView
+                tfInterface: d.tfInterface
+            }
+
+            // List View
+            ListView {
+                id: frameListView
+                clip: true
+                model: d.tfInterface.frames
+
+                ScrollBar.vertical: ScrollBar {
+                    policy: frameListView.contentHeight > frameListView.height ? ScrollBar.AlwaysOn : ScrollBar.AlwaysOff
+                }
+
+                header: Rectangle {
+                    width: frameListView.width
+                    height: 32
+                    color: palette.mid
+                    z: 2
+
+                    RowLayout {
+                        anchors.fill: parent
+                        anchors.leftMargin: 8
+                        anchors.rightMargin: 8
+                        spacing: 8
+
+                        Label {
+                            Layout.preferredWidth: 250
+                            text: "Frame"
+                            font.bold: true
+                        }
+
+                        Label {
+                            Layout.preferredWidth: 80
+                            text: "Age"
+                            font.bold: true
+                        }
+
+                        Label {
+                            Layout.fillWidth: true
+                            text: "Transform"
+                            font.bold: true
+                        }
+                    }
+                }
+                headerPositioning: ListView.OverlayHeader
+
+                delegate: Rectangle {
+                    id: delegateRoot
+                    required property var model
+                    required property int index
+                    width: frameListView.width
+                    height: 36
+                    color: index % 2 === 0 ? palette.base : palette.alternateBase
+
+                    RowLayout {
+                        anchors.fill: parent
+                        anchors.leftMargin: 8 + model.depth * 20
+                        anchors.rightMargin: 8
+                        spacing: 8
+
+                        // Tree indicator and frame name
+                        RowLayout {
+                            Layout.preferredWidth: 250 - model.depth * 20
+                            spacing: 4
+
+                            // Tree branch indicator
+                            Label {
+                                text: model.hasChildren ? "\u25BC" : "\u2022"
+                                font.pixelSize: model.hasChildren ? 10 : 8
+                                color: palette.text
+                                opacity: 0.6
+                            }
+
+                            // Static indicator
+                            Rectangle {
+                                width: 8
+                                height: 8
+                                radius: 4
+                                color: model.isStatic ? "#3498db" : "#2ecc71"
+                                visible: model.updateCount > 0
+
+                                ToolTip.visible: staticMouseArea.containsMouse
+                                ToolTip.text: model.isStatic ? "Static transform" : "Dynamic transform"
+
+                                MouseArea {
+                                    id: staticMouseArea
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                }
+                            }
+
+                            // Frame name
+                            Label {
+                                Layout.fillWidth: true
+                                text: model.frameId
+                                elide: Text.ElideRight
+
+                                ToolTip.visible: nameMouseArea.containsMouse && truncated
+                                ToolTip.text: model.frameId
+
+                                MouseArea {
+                                    id: nameMouseArea
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                }
+                            }
+                        }
+
+                        // Age column
+                        Label {
+                            Layout.preferredWidth: 80
+                            text: d.formatAge(model.age)
+                            color: d.getAgeColor(model.age, model.isStatic)
+                        }
+
+                        // Transform column
+                        Label {
+                            Layout.fillWidth: true
+                            text: model.updateCount > 0
+                                ? "t: [" + model.translationX.toFixed(3) + ", " +
+                                           model.translationY.toFixed(3) + ", " +
+                                           model.translationZ.toFixed(3) + "]"
+                                : "waiting..."
+                            color: model.updateCount > 0 ? palette.text : palette.mid
+                            elide: Text.ElideRight
+                            font.family: "monospace"
+                        }
+                    }
+
+                    // Context menu for copying frame info
+                    MouseArea {
+                        anchors.fill: parent
+                        acceptedButtons: Qt.RightButton
+                        onClicked: mouse => {
+                            if (mouse.button === Qt.RightButton) {
+                                contextMenu.popup();
+                            }
+                        }
+
+                        Menu {
+                            id: contextMenu
+
+                            Action {
+                                text: "Copy Frame ID"
+                                onTriggered: RQml.copyTextToClipboard(model.frameId)
+                            }
+
+                            Action {
+                                text: "Copy Parent ID"
+                                enabled: model.parentId !== ""
+                                onTriggered: RQml.copyTextToClipboard(model.parentId)
+                            }
+
+                            MenuSeparator {}
+
+                            Action {
+                                text: "Copy Transform"
+                                enabled: model.updateCount > 0
+                                onTriggered: {
+                                    const tf = "translation: [" + model.translationX + ", " +
+                                               model.translationY + ", " + model.translationZ + "]\n" +
+                                               "rotation: [" + model.rotationX + ", " +
+                                               model.rotationY + ", " + model.rotationZ + ", " +
+                                               model.rotationW + "]";
+                                    RQml.copyTextToClipboard(tf);
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Empty state
+                Label {
+                    anchors.centerIn: parent
+                    visible: d.tfInterface.frameCount === 0
+                    text: context.enabled
+                        ? "Waiting for TF data...\nSubscribed to: " + (context.namespace || "") + "/tf"
+                        : "Paused"
+                    horizontalAlignment: Text.AlignHCenter
+                    color: palette.mid
+                }
+            }
+        }
+
+        // --------------------------------------------------------------------
+        // Status Bar
+        // --------------------------------------------------------------------
+
+        RowLayout {
+            Layout.fillWidth: true
+            spacing: 8
+
+            Label {
+                text: "Root frames: " + d.tfInterface.rootFrames.length
+                color: palette.mid
+            }
+
+            Item { Layout.fillWidth: true }
+
+            Label {
+                text: "Topics: " + (context.namespace || "") + "/tf, " + (context.namespace || "") + "/tf_static"
+                color: palette.mid
+                font.pixelSize: 11
+            }
+        }
+    }
+}
