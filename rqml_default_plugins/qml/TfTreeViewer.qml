@@ -249,6 +249,10 @@ Rectangle {
                 id: frameListView
                 clip: true
                 model: d.tfInterface.frames
+                reuseItems: true
+                boundsBehavior: Flickable.StopAtBounds
+                // Improve scrolling by caching more delegates
+                cacheBuffer: 400
 
                 ScrollBar.vertical: ScrollBar {
                     policy: frameListView.contentHeight > frameListView.height ? ScrollBar.AlwaysOn : ScrollBar.AlwaysOff
@@ -264,24 +268,33 @@ Rectangle {
                         anchors.fill: parent
                         anchors.leftMargin: 8
                         anchors.rightMargin: 8
-                        spacing: 8
-
-                        Label {
-                            Layout.preferredWidth: 250
-                            text: "Frame"
-                            font.bold: true
-                        }
-
-                        Label {
-                            Layout.preferredWidth: 80
-                            text: "Age"
-                            font.bold: true
-                        }
+                        spacing: 0
 
                         Label {
                             Layout.fillWidth: true
+                            height: parent.height
+                            text: "Frame"
+                            font.bold: true
+                            verticalAlignment: Text.AlignVCenter
+                        }
+
+                        Label {
+                            Layout.preferredWidth: 70
+                            height: parent.height
+                            text: "Age"
+                            font.bold: true
+                            verticalAlignment: Text.AlignVCenter
+                            horizontalAlignment: Text.AlignRight
+                        }
+
+                        Label {
+                            Layout.preferredWidth: 220
+                            Layout.rightMargin: 4
+                            height: parent.height
                             text: "Transform"
                             font.bold: true
+                            verticalAlignment: Text.AlignVCenter
+                            horizontalAlignment: Text.AlignRight
                         }
                     }
                 }
@@ -297,76 +310,94 @@ Rectangle {
 
                     RowLayout {
                         anchors.fill: parent
-                        anchors.leftMargin: 8 + model.depth * 20
+                        anchors.leftMargin: 8
                         anchors.rightMargin: 8
-                        spacing: 8
+                        spacing: 0
 
-                        // Tree indicator and frame name
-                        RowLayout {
-                            Layout.preferredWidth: 250 - model.depth * 20
-                            spacing: 4
+                        // Frame column (fill available width)
+                        Item {
+                            Layout.fillWidth: true
+                            height: parent.height
 
-                            // Tree branch indicator
-                            Label {
-                                text: model.hasChildren ? "\u25BC" : "\u2022"
-                                font.pixelSize: model.hasChildren ? 10 : 8
-                                color: palette.text
-                                opacity: 0.6
-                            }
+                            Row {
+                                anchors.fill: parent
+                                anchors.leftMargin: model.depth * 16
+                                spacing: 4
 
-                            // Static indicator
-                            Rectangle {
-                                width: 8
-                                height: 8
-                                radius: 4
-                                color: model.isStatic ? "#3498db" : "#2ecc71"
-                                visible: model.updateCount > 0
-
-                                ToolTip.visible: staticMouseArea.containsMouse
-                                ToolTip.text: model.isStatic ? "Static transform" : "Dynamic transform"
-
-                                MouseArea {
-                                    id: staticMouseArea
-                                    anchors.fill: parent
-                                    hoverEnabled: true
+                                // Tree branch indicator
+                                Label {
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    text: model.hasChildren ? "\u25BC" : "\u2022"
+                                    font.pixelSize: model.hasChildren ? 10 : 8
+                                    color: palette.text
+                                    opacity: 0.6
+                                    width: 12
+                                    horizontalAlignment: Text.AlignHCenter
                                 }
-                            }
 
-                            // Frame name
-                            Label {
-                                Layout.fillWidth: true
-                                text: model.frameId
-                                elide: Text.ElideRight
+                                // Static indicator
+                                Rectangle {
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    width: 8
+                                    height: 8
+                                    radius: 4
+                                    color: model.isStatic ? "#3498db" : "#2ecc71"
+                                    visible: model.updateCount > 0
 
-                                ToolTip.visible: nameMouseArea.containsMouse && truncated
-                                ToolTip.text: model.frameId
+                                    ToolTip.visible: staticMouseArea.containsMouse
+                                    ToolTip.text: model.isStatic ? "Static transform" : "Dynamic transform"
 
-                                MouseArea {
-                                    id: nameMouseArea
-                                    anchors.fill: parent
-                                    hoverEnabled: true
+                                    MouseArea {
+                                        id: staticMouseArea
+                                        anchors.fill: parent
+                                        hoverEnabled: true
+                                    }
+                                }
+
+                                // Frame name
+                                Label {
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    width: parent.width - 12 - 12 - model.depth * 16
+                                    text: model.frameId
+                                    elide: Text.ElideRight
+
+                                    ToolTip.visible: nameMouseArea.containsMouse && truncated
+                                    ToolTip.text: model.frameId
+
+                                    MouseArea {
+                                        id: nameMouseArea
+                                        anchors.fill: parent
+                                        hoverEnabled: true
+                                    }
                                 }
                             }
                         }
 
-                        // Age column
+                        // Age column (fixed width, right aligned)
                         Label {
-                            Layout.preferredWidth: 80
+                            Layout.preferredWidth: 70
+                            height: parent.height
                             text: d.formatAge(model.age)
                             color: d.getAgeColor(model.age, model.isStatic)
+                            verticalAlignment: Text.AlignVCenter
+                            horizontalAlignment: Text.AlignRight
                         }
 
-                        // Transform column
+                        // Transform column (fixed width, right aligned)
                         Label {
-                            Layout.fillWidth: true
+                            Layout.preferredWidth: 220
+                            Layout.rightMargin: 4
+                            height: parent.height
                             text: model.updateCount > 0
                                 ? "t: [" + model.translationX.toFixed(3) + ", " +
                                            model.translationY.toFixed(3) + ", " +
                                            model.translationZ.toFixed(3) + "]"
                                 : "waiting..."
                             color: model.updateCount > 0 ? palette.text : palette.mid
-                            elide: Text.ElideRight
+                            elide: Text.ElideLeft
                             font.family: "monospace"
+                            verticalAlignment: Text.AlignVCenter
+                            horizontalAlignment: Text.AlignRight
                         }
                     }
 

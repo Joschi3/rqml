@@ -109,12 +109,11 @@ Object {
         property var frameData: ({})
         property var frameIds: []
         property var staticFrames: ({})
+        property var frameToModelIndex: ({})  // Maps frameId to model index
+        property bool structureChanged: false
 
         //! Flag to temporarily disable static subscription for re-subscription
         property bool resubscribing: false
-
-        //! Debug counter for static messages received
-        property int staticMsgCount: 0
 
         /**
          * Force re-subscription by briefly disabling and re-enabling the subscription.
@@ -139,6 +138,7 @@ Object {
 
         function processTransforms(transforms, isStatic) {
             const now = Date.now();
+            let structureChanged = false;
 
             for (let i = 0; i < transforms.length; ++i) {
                 const tf = transforms.at(i);
@@ -155,6 +155,7 @@ Object {
                 const isNewFrame = !d.frameData[childFrame];
 
                 if (isNewFrame) {
+                    structureChanged = true;
                     d.frameIds.push(childFrame);
                     d.frameData[childFrame] = {
                         frameId: childFrame,
@@ -179,6 +180,17 @@ Object {
                     const frame = d.frameData[childFrame];
                     const prevParent = frame.parentId;
 
+                    if (prevParent !== parentFrame) {
+                        structureChanged = true;
+                        if (d.frameData[prevParent]) {
+                            const oldParent = d.frameData[prevParent];
+                            const idx = oldParent.children.indexOf(childFrame);
+                            if (idx !== -1) {
+                                oldParent.children.splice(idx, 1);
+                            }
+                        }
+                    }
+
                     frame.parentId = parentFrame;
                     frame.isStatic = d.staticFrames[childFrame] || false;
                     frame.lastUpdate = now;
@@ -195,16 +207,14 @@ Object {
                         w: tf.transform.rotation.w
                     };
 
-                    if (prevParent !== parentFrame && d.frameData[prevParent]) {
-                        const oldParent = d.frameData[prevParent];
-                        const idx = oldParent.children.indexOf(childFrame);
-                        if (idx !== -1) {
-                            oldParent.children.splice(idx, 1);
-                        }
+                    // Update model in place if structure hasn't changed
+                    if (!structureChanged) {
+                        d.updateModelItem(childFrame);
                     }
                 }
 
                 if (parentFrame && parentFrame !== "" && !d.frameData[parentFrame]) {
+                    structureChanged = true;
                     d.frameIds.push(parentFrame);
                     d.frameData[parentFrame] = {
                         frameId: parentFrame,
@@ -221,12 +231,41 @@ Object {
                 if (parentFrame && parentFrame !== "" && d.frameData[parentFrame]) {
                     const parent = d.frameData[parentFrame];
                     if (parent.children.indexOf(childFrame) === -1) {
+                        structureChanged = true;
                         parent.children.push(childFrame);
                     }
                 }
             }
 
-            d.rebuildModel();
+            // Only rebuild model when structure changes (new frames, reparenting)
+            if (structureChanged) {
+                d.rebuildModel();
+            }
+        }
+
+        function updateModelItem(frameId) {
+            const idx = d.frameToModelIndex[frameId];
+            if (idx === undefined)
+                return;
+
+            const frame = d.frameData[frameId];
+            if (!frame)
+                return;
+
+            const now = Date.now();
+            const age = frame.lastUpdate > 0 ? (now - frame.lastUpdate) / 1000.0 : -1;
+
+            root.frames.setProperty(idx, "lastUpdate", frame.lastUpdate);
+            root.frames.setProperty(idx, "age", age);
+            root.frames.setProperty(idx, "updateCount", frame.updateCount);
+            root.frames.setProperty(idx, "isStatic", frame.isStatic);
+            root.frames.setProperty(idx, "translationX", frame.translation.x);
+            root.frames.setProperty(idx, "translationY", frame.translation.y);
+            root.frames.setProperty(idx, "translationZ", frame.translation.z);
+            root.frames.setProperty(idx, "rotationX", frame.rotation.x);
+            root.frames.setProperty(idx, "rotationY", frame.rotation.y);
+            root.frames.setProperty(idx, "rotationZ", frame.rotation.z);
+            root.frames.setProperty(idx, "rotationW", frame.rotation.w);
         }
 
         function rebuildModel() {
@@ -242,6 +281,7 @@ Object {
             root.rootFrames = roots;
 
             root.frames.clear();
+            d.frameToModelIndex = {};
             for (let i = 0; i < roots.length; ++i) {
                 d.addFrameToModel(roots[i], 0);
             }
@@ -258,6 +298,7 @@ Object {
             const now = Date.now();
             const age = frame.lastUpdate > 0 ? (now - frame.lastUpdate) / 1000.0 : -1;
 
+            d.frameToModelIndex[frameId] = root.frames.count;
             root.frames.append({
                 frameId: frame.frameId,
                 parentId: frame.parentId,
@@ -307,29 +348,18 @@ Object {
         onNewMessage: function(msg) {
             if (!root.enabled)
                 return;
-            d.staticMsgCount++;
-            console.log("[TfTreeInterface] tf_static msg #" + d.staticMsgCount + ": received " + msg.transforms.length + " transforms on " + tfStaticSubscription.topic);
             d.processTransforms(msg.transforms, true);
-        }
-        onTopicChanged: {
-            d.staticMsgCount = 0;
-            console.log("[TfTreeInterface] tf_static topic changed to:", topic);
         }
     }
 
-    // Timer to complete the re-subscription cycle
-    // Note: We need a short delay to force the subscription to disconnect,
-    // then the new subscription will receive transient_local messages from all publishers.
-    // DDS discovery of multiple publishers takes time, but the transient_local messages
-    // should arrive as each publisher is discovered.
+    // Timer to complete the re-subscription cycle.
+    // A short delay forces the subscription to disconnect and reconnect,
+    // which triggers re-delivery of transient_local messages.
     Timer {
         id: resubscribeTimer
         interval: 50
         repeat: false
-        onTriggered: {
-            console.log("[TfTreeInterface] Resubscribe timer triggered, re-enabling subscription");
-            d.resubscribing = false;
-        }
+        onTriggered: d.resubscribing = false
     }
 
     // ========================================================================
