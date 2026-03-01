@@ -37,6 +37,12 @@ Rectangle {
     //! Age threshold (in seconds) after which a dynamic transform is considered stale
     readonly property real staleThreshold: 5.0
 
+    //! Semantic status colors shared with sub-components
+    readonly property color freshColor: "#2ecc71"
+    readonly property color staticColor: "#3498db"
+    readonly property color staleColor: "#e74c3c"
+    readonly property color warningColor: "#f39c12"
+
     // ========================================================================
     // Private Data
     // ========================================================================
@@ -109,47 +115,17 @@ Rectangle {
             return display === "(global)" ? "" : display;
         }
 
-        /**
-         * Format age value for display.
-         */
-        function formatAge(age) {
-            if (age < 0)
-                return "N/A";
-            if (age < 1)
-                return (age * 1000).toFixed(0) + " ms";
-            if (age < 60)
-                return age.toFixed(1) + " s";
-            return (age / 60).toFixed(1) + " min";
-        }
-
-        /**
-         * Get color based on frame age (stale detection).
-         */
+        //! Get color based on frame age (stale detection)
         function getAgeColor(age, isStatic) {
             if (isStatic)
                 return palette.text;
             if (age < 0)
-                return "#888888"; // Unknown
+                return palette.mid;
             if (age < 1)
-                return "#2ecc71"; // Fresh (green)
+                return root.freshColor;
             if (age < root.staleThreshold)
-                return "#f39c12"; // Warning (orange)
-            return "#e74c3c"; // Stale (red)
-        }
-
-        /**
-         * Format frequency value for display.
-         */
-        function formatFrequency(freq, isStatic) {
-            if (isStatic)
-                return "static";
-            if (freq <= 0)
-                return "-";
-            if (freq < 1)
-                return freq.toFixed(2) + " Hz";
-            if (freq < 10)
-                return freq.toFixed(1) + " Hz";
-            return freq.toFixed(0) + " Hz";
+                return root.warningColor;
+            return root.staleColor;
         }
     }
 
@@ -268,6 +244,9 @@ Rectangle {
                 id: graphView
                 tfInterface: d.tfInterface
                 staleThreshold: root.staleThreshold
+                freshColor: root.freshColor
+                staticColor: root.staticColor
+                staleColor: root.staleColor
             }
 
             // List View
@@ -387,7 +366,7 @@ Rectangle {
                                     width: 8
                                     height: 8
                                     radius: 4
-                                    color: model.isStatic ? "#3498db" : "#2ecc71"
+                                    color: model.isStatic ? root.staticColor : root.freshColor
                                     visible: model.updateCount > 0
 
                                     ToolTip.visible: staticMouseArea.containsMouse
@@ -401,20 +380,10 @@ Rectangle {
                                 }
 
                                 // Frame name
-                                Label {
+                                TruncatedLabel {
                                     anchors.verticalCenter: parent.verticalCenter
                                     width: parent.width - 16 - 12 - model.depth * root.indentPerLevel
                                     text: model.frameId
-                                    elide: Text.ElideRight
-
-                                    ToolTip.visible: nameMouseArea.containsMouse && truncated
-                                    ToolTip.text: model.frameId
-
-                                    MouseArea {
-                                        id: nameMouseArea
-                                        anchors.fill: parent
-                                        hoverEnabled: true
-                                    }
                                 }
                             }
                         }
@@ -423,7 +392,7 @@ Rectangle {
                         Label {
                             Layout.preferredWidth: 60
                             height: parent.height
-                            text: d.formatFrequency(model.frequency, model.isStatic)
+                            text: d.tfInterface.formatFrequency(model.frequency, model.isStatic)
                             color: model.isStatic ? palette.mid : palette.text
                             verticalAlignment: Text.AlignVCenter
                             horizontalAlignment: Text.AlignRight
@@ -434,7 +403,7 @@ Rectangle {
                         Label {
                             Layout.preferredWidth: 60
                             height: parent.height
-                            text: d.formatAge(model.age)
+                            text: d.tfInterface.formatAge(model.age)
                             color: d.getAgeColor(model.age, model.isStatic)
                             verticalAlignment: Text.AlignVCenter
                             horizontalAlignment: Text.AlignRight

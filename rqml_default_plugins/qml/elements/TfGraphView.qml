@@ -16,16 +16,21 @@ Item {
     //! Age threshold (in seconds) after which a dynamic transform is considered stale
     property real staleThreshold: 5.0
 
-    //! Node styling
-    property color nodeColor: "#2ecc71"
-    property color staticNodeColor: "#3498db"
+    //! Semantic status colors (set by parent to avoid duplication)
+    property color freshColor: "#2ecc71"
+    property color staticColor: "#3498db"
+    property color staleColor: "#e74c3c"
+
+    //! Layout direction: true = left-to-right, false = top-to-bottom
+    property bool horizontal: true
+
+    //! Node styling derived from palette
     property color nodeTextColor: "#ffffff"
-    property color edgeColor: "#7f8c8d"
-    property color staleNodeColor: "#e74c3c"
-    property int nodeWidth: 220
-    property int nodeHeight: 32
-    property int levelSpacing: 90
-    property int nodeSpacing: 25
+    property color edgeColor: "#f39c12"
+    property int nodeWidth: 160
+    property int nodeHeight: 28
+    property int levelSpacing: 30
+    property int nodeSpacing: 4
 
     // ========================================================================
     // Public Functions
@@ -88,16 +93,14 @@ Item {
         property string selectedNode: ""
 
         /**
-         * Calculate hierarchical layout for all frames.
+         * Calculate layout for all frames.
+         * Horizontal mode: root frames on the left, children extend to the right.
+         * Vertical mode: root frames on top, children extend downward.
+         * Uses bottom-up subtree size calculation so children are centered
+         * relative to their parent.
          */
         function calculateLayout() {
-            if (!root.tfInterface) {
-                d.nodePositions = [];
-                d.edges = [];
-                return;
-            }
-
-            if (root.tfInterface.frameCount === 0) {
+            if (!root.tfInterface || root.tfInterface.frameCount === 0) {
                 d.nodePositions = [];
                 d.edges = [];
                 return;
@@ -105,67 +108,79 @@ Item {
 
             const positions = [];
             const edgeList = [];
-            const levelNodes = {};  // level -> [frameIds]
-            const frameLevel = {};  // frameId -> level
-            const framePos = {};    // frameId -> {x, y}
+            const framePos = {};     // frameId -> {x, y}
+            const subtreeSpan = {};  // frameId -> cross-axis span in pixels
+            const horiz = root.horizontal;
 
-            // Calculate levels using BFS from root frames
-            const rootFrames = root.tfInterface.rootFrames;
-            const queue = [];
+            // The "cross-axis" is the axis perpendicular to the tree growth direction.
+            // Horizontal: cross = vertical (height), Vertical: cross = horizontal (width).
+            const nodeMainSize = horiz ? nodeWidth : nodeHeight;
+            const nodeCrossSize = horiz ? nodeHeight : nodeWidth;
 
-            for (let i = 0; i < rootFrames.length; ++i) {
-                queue.push({ frameId: rootFrames[i], level: 0 });
-                frameLevel[rootFrames[i]] = 0;
-            }
-
-            while (queue.length > 0) {
-                const current = queue.shift();
-                const frameId = current.frameId;
-                const level = current.level;
-
-                if (!levelNodes[level])
-                    levelNodes[level] = [];
-                levelNodes[level].push(frameId);
-
-                const children = root.tfInterface.getChildren(frameId);
+            // Calculate the cross-axis span each subtree needs (bottom-up)
+            function calcSpan(frameId) {
+                const children = root.tfInterface.getChildren(frameId).slice().sort();
+                if (children.length === 0) {
+                    subtreeSpan[frameId] = nodeCrossSize;
+                    return nodeCrossSize;
+                }
+                let total = 0;
                 for (let i = 0; i < children.length; ++i) {
-                    const child = children[i];
-                    if (frameLevel[child] === undefined) {
-                        frameLevel[child] = level + 1;
-                        queue.push({ frameId: child, level: level + 1 });
-                    }
+                    if (i > 0)
+                        total += nodeSpacing;
+                    total += calcSpan(children[i]);
+                }
+                subtreeSpan[frameId] = Math.max(total, nodeCrossSize);
+                return subtreeSpan[frameId];
+            }
+
+            // Place a node and its children recursively.
+            // mainPos: position along tree growth axis, crossPos: start of allocated cross-axis space.
+            function placeNode(frameId, mainPos, crossPos) {
+                const mySpan = subtreeSpan[frameId];
+                const centeredCross = crossPos + (mySpan - nodeCrossSize) / 2;
+                const x = horiz ? mainPos : centeredCross;
+                const y = horiz ? centeredCross : mainPos;
+                framePos[frameId] = { x: x, y: y };
+
+                const frame = root.tfInterface.getFrame(frameId);
+                positions.push({
+                    frameId: frameId,
+                    x: x,
+                    y: y,
+                    isStatic: frame ? frame.isStatic : false,
+                    age: frame ? (Date.now() - frame.lastUpdate) / 1000.0 : -1,
+                    updateCount: frame ? frame.updateCount : 0
+                });
+
+                const children = root.tfInterface.getChildren(frameId).slice().sort();
+                const childMain = mainPos + nodeMainSize + levelSpacing;
+                let childCross = crossPos;
+                for (let i = 0; i < children.length; ++i) {
+                    placeNode(children[i], childMain, childCross);
+                    childCross += subtreeSpan[children[i]] + nodeSpacing;
                 }
             }
 
-            // Position nodes at each level
-            let maxLevel = 0;
-            for (let level in levelNodes) {
-                maxLevel = Math.max(maxLevel, parseInt(level));
+            // Layout each root tree stacked along the cross axis
+            const rootFrames = root.tfInterface.rootFrames;
+            for (let i = 0; i < rootFrames.length; ++i) {
+                calcSpan(rootFrames[i]);
             }
 
-            for (let level = 0; level <= maxLevel; ++level) {
-                const nodes = levelNodes[level] || [];
-                const totalWidth = nodes.length * nodeWidth + (nodes.length - 1) * nodeSpacing;
-                let startX = -totalWidth / 2 + nodeWidth / 2;
+            let totalCross = 0;
+            for (let i = 0; i < rootFrames.length; ++i) {
+                if (i > 0)
+                    totalCross += nodeSpacing * 5;
+                totalCross += subtreeSpan[rootFrames[i]];
+            }
 
-                for (let i = 0; i < nodes.length; ++i) {
-                    const frameId = nodes[i];
-                    const x = startX + i * (nodeWidth + nodeSpacing);
-                    const y = level * (nodeHeight + levelSpacing);
-
-                    framePos[frameId] = { x: x, y: y };
-
-                    const frame = root.tfInterface.getFrame(frameId);
-                    positions.push({
-                        frameId: frameId,
-                        x: x,
-                        y: y,
-                        level: level,
-                        isStatic: frame ? frame.isStatic : false,
-                        age: frame ? (Date.now() - frame.lastUpdate) / 1000.0 : -1,
-                        updateCount: frame ? frame.updateCount : 0
-                    });
-                }
+            let curCross = -totalCross / 2;
+            for (let i = 0; i < rootFrames.length; ++i) {
+                if (i > 0)
+                    curCross += nodeSpacing * 5;
+                placeNode(rootFrames[i], 0, curCross);
+                curCross += subtreeSpan[rootFrames[i]];
             }
 
             // Create edges
@@ -173,15 +188,22 @@ Item {
                 const node = positions[i];
                 const frame = root.tfInterface.getFrame(node.frameId);
                 if (frame && frame.parentId && framePos[frame.parentId]) {
-                    const parentPos = framePos[frame.parentId];
-                    edgeList.push({
-                        from: frame.parentId,
-                        to: node.frameId,
-                        fromX: parentPos.x + nodeWidth / 2,
-                        fromY: parentPos.y + nodeHeight,
-                        toX: node.x + nodeWidth / 2,
-                        toY: node.y
-                    });
+                    const pp = framePos[frame.parentId];
+                    if (horiz) {
+                        // Right side of parent → left side of child
+                        edgeList.push({
+                            from: frame.parentId, to: node.frameId,
+                            fromX: pp.x + nodeWidth,   fromY: pp.y + nodeHeight / 2,
+                            toX: node.x,                toY: node.y + nodeHeight / 2
+                        });
+                    } else {
+                        // Bottom of parent → top of child
+                        edgeList.push({
+                            from: frame.parentId, to: node.frameId,
+                            fromX: pp.x + nodeWidth / 2, fromY: pp.y + nodeHeight,
+                            toX: node.x + nodeWidth / 2, toY: node.y
+                        });
+                    }
                 }
             }
 
@@ -194,25 +216,12 @@ Item {
          */
         function getNodeColor(node) {
             if (node.updateCount === 0)
-                return "#95a5a6";  // Gray for nodes without data
+                return "#9b59b6";
             if (!node.isStatic && node.age > root.staleThreshold)
-                return staleNodeColor;
+                return root.staleColor;
             if (node.isStatic)
-                return staticNodeColor;
-            return nodeColor;
-        }
-
-        /**
-         * Format age value for display.
-         */
-        function formatAge(age) {
-            if (age < 0)
-                return "N/A";
-            if (age < 1)
-                return (age * 1000).toFixed(0) + " ms";
-            if (age < 60)
-                return age.toFixed(1) + " s";
-            return (age / 60).toFixed(1) + " min";
+                return root.staticColor;
+            return root.freshColor;
         }
 
         /**
@@ -255,6 +264,11 @@ Item {
                 root.fitToView();
             }
         }
+    }
+
+    onHorizontalChanged: {
+        d.calculateLayout();
+        root.fitToView();
     }
 
     onTfInterfaceChanged: {
@@ -315,35 +329,45 @@ Item {
             // Draw edges with arrows
             ctx.strokeStyle = edgeColor;
             ctx.lineWidth = 2 / d.scale;
-            const arrowSize = 10;  // Fixed size in graph coordinates
-            const arrowWidth = arrowSize * 0.6;
+            const arrowSize = 7;
+            const arrowWidth = arrowSize * 0.5;
 
             for (let i = 0; i < d.edges.length; ++i) {
                 const edge = d.edges[i];
 
-                // Arrow tip touches the node, arrow base is arrowSize above
-                const arrowTipY = edge.toY;
-                const arrowBaseY = edge.toY - arrowSize;
+                if (root.horizontal) {
+                    // Horizontal: arrow pointing right
+                    const arrowBaseX = edge.toX - arrowSize;
+                    ctx.beginPath();
+                    ctx.moveTo(edge.fromX, edge.fromY);
+                    const midX = (edge.fromX + arrowBaseX) / 2;
+                    ctx.bezierCurveTo(midX, edge.fromY, midX, edge.toY, arrowBaseX, edge.toY);
+                    ctx.stroke();
 
-                // Draw bezier curve ending at top of arrow (not at node)
-                ctx.beginPath();
-                ctx.moveTo(edge.fromX, edge.fromY);
-                const midY = (edge.fromY + arrowBaseY) / 2;
-                ctx.bezierCurveTo(
-                    edge.fromX, midY,
-                    edge.toX, midY,
-                    edge.toX, arrowBaseY
-                );
-                ctx.stroke();
+                    ctx.beginPath();
+                    ctx.moveTo(edge.toX, edge.toY);
+                    ctx.lineTo(arrowBaseX, edge.toY - arrowWidth);
+                    ctx.lineTo(arrowBaseX, edge.toY + arrowWidth);
+                    ctx.closePath();
+                    ctx.fillStyle = edgeColor;
+                    ctx.fill();
+                } else {
+                    // Vertical: arrow pointing down
+                    const arrowBaseY = edge.toY - arrowSize;
+                    ctx.beginPath();
+                    ctx.moveTo(edge.fromX, edge.fromY);
+                    const midY = (edge.fromY + arrowBaseY) / 2;
+                    ctx.bezierCurveTo(edge.fromX, midY, edge.toX, midY, edge.toX, arrowBaseY);
+                    ctx.stroke();
 
-                // Draw arrow pointing downward
-                ctx.beginPath();
-                ctx.moveTo(edge.toX, arrowTipY);
-                ctx.lineTo(edge.toX - arrowWidth, arrowBaseY);
-                ctx.lineTo(edge.toX + arrowWidth, arrowBaseY);
-                ctx.closePath();
-                ctx.fillStyle = edgeColor;
-                ctx.fill();
+                    ctx.beginPath();
+                    ctx.moveTo(edge.toX, edge.toY);
+                    ctx.lineTo(edge.toX - arrowWidth, arrowBaseY);
+                    ctx.lineTo(edge.toX + arrowWidth, arrowBaseY);
+                    ctx.closePath();
+                    ctx.fillStyle = edgeColor;
+                    ctx.fill();
+                }
             }
 
             // Draw nodes
@@ -353,7 +377,7 @@ Item {
                 const isSelected = node.frameId === d.selectedNode;
 
                 // Node background - manual rounded rectangle (roundRect not available in QML Canvas)
-                const r = 5;  // corner radius
+                const r = 4;  // corner radius
                 const x = node.x;
                 const y = node.y;
                 const w = nodeWidth;
@@ -382,7 +406,7 @@ Item {
 
                 // Node text (fixed size in graph coordinates, scales with zoom)
                 ctx.fillStyle = nodeTextColor;
-                ctx.font = "bold 12px sans-serif";
+                ctx.font = "bold 11px sans-serif";
                 ctx.textAlign = "center";
                 ctx.textBaseline = "middle";
 
@@ -513,14 +537,30 @@ Item {
 
     ToolTip {
         id: tooltip
-        visible: d.hoveredNode !== ""
+        delay: 0
+        timeout: -1
         x: mouseArea.mouseX + 15
         y: mouseArea.mouseY + 15
+
+        // Show/hide immediately without fade animation
+        enter: Transition {}
+        exit: Transition {}
 
         // Cache the hovered frame to avoid repeated lookups
         property var hoveredFrame: d.hoveredNode && root.tfInterface
             ? root.tfInterface.getFrame(d.hoveredNode)
             : null
+
+        // Open/close explicitly so no ghost rectangle lingers
+        Connections {
+            target: d
+            function onHoveredNodeChanged() {
+                if (d.hoveredNode !== "")
+                    tooltip.open();
+                else
+                    tooltip.close();
+            }
+        }
 
         contentItem: Column {
             spacing: 4
@@ -528,12 +568,13 @@ Item {
             Label {
                 text: d.hoveredNode
                 font.bold: true
+                font.pixelSize: 14
             }
 
             Label {
                 visible: tooltip.hoveredFrame && tooltip.hoveredFrame.parentId !== ""
                 text: tooltip.hoveredFrame ? "Parent: " + tooltip.hoveredFrame.parentId : ""
-                font.pixelSize: 11
+                font.pixelSize: 13
             }
 
             Label {
@@ -543,9 +584,9 @@ Item {
                     if (tooltip.hoveredFrame.isStatic)
                         return "Static transform";
                     const age = (Date.now() - tooltip.hoveredFrame.lastUpdate) / 1000.0;
-                    return "Age: " + d.formatAge(age);
+                    return "Age: " + root.tfInterface.formatAge(age);
                 }
-                font.pixelSize: 11
+                font.pixelSize: 13
             }
         }
     }
@@ -589,6 +630,16 @@ Item {
             ToolTip.visible: hovered
             ToolTip.text: "Fit to view"
         }
+
+        Button {
+            width: 32
+            height: 32
+            text: root.horizontal ? "\u2194" : "\u2195"  // ↔ or ↕
+            onClicked: root.horizontal = !root.horizontal
+
+            ToolTip.visible: hovered
+            ToolTip.text: root.horizontal ? "Switch to vertical layout" : "Switch to horizontal layout"
+        }
     }
 
     // ========================================================================
@@ -613,19 +664,19 @@ Item {
 
             Row {
                 spacing: 8
-                Rectangle { width: 12; height: 12; radius: 2; color: nodeColor }
+                Rectangle { width: 12; height: 12; radius: 2; color: root.freshColor }
                 Label { text: "Dynamic"; font.pixelSize: 11 }
             }
 
             Row {
                 spacing: 8
-                Rectangle { width: 12; height: 12; radius: 2; color: staticNodeColor }
+                Rectangle { width: 12; height: 12; radius: 2; color: root.staticColor }
                 Label { text: "Static"; font.pixelSize: 11 }
             }
 
             Row {
                 spacing: 8
-                Rectangle { width: 12; height: 12; radius: 2; color: staleNodeColor }
+                Rectangle { width: 12; height: 12; radius: 2; color: root.staleColor }
                 Label { text: "Stale (>" + root.staleThreshold + "s)"; font.pixelSize: 11 }
             }
         }

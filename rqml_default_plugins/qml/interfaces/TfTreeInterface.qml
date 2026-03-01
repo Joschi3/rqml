@@ -31,6 +31,34 @@ Object {
     signal treeChanged()
 
     // ========================================================================
+    // Formatting Helpers
+    // ========================================================================
+
+    //! Format an age value (seconds) for display
+    function formatAge(age) {
+        if (age < 0)
+            return "N/A";
+        if (age < 1)
+            return (age * 1000).toFixed(0) + " ms";
+        if (age < 60)
+            return age.toFixed(1) + " s";
+        return (age / 60).toFixed(1) + " min";
+    }
+
+    //! Format a frequency value for display
+    function formatFrequency(freq, isStatic) {
+        if (isStatic)
+            return "static";
+        if (freq <= 0)
+            return "-";
+        if (freq < 1)
+            return freq.toFixed(2) + " Hz";
+        if (freq < 10)
+            return freq.toFixed(1) + " Hz";
+        return freq.toFixed(0) + " Hz";
+    }
+
+    // ========================================================================
     // Public Functions
     // ========================================================================
 
