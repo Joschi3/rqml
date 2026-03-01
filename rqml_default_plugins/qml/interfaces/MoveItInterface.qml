@@ -13,8 +13,11 @@ Object {
     // Public Properties
     // ========================================================================
 
-    //! The namespace prefix for topics (e.g., "" or "/robot")
-    property string namespace: ""
+    //! The selected MoveGroup action server (e.g., "/move_action" or "/athena/fold_manager_action")
+    property string actionServer: ""
+
+    //! Available MoveGroup action servers discovered via Ros2.queryActions()
+    property var actionServers: ListModel {}
 
     //! The currently selected move group name
     property string moveGroupName: ""
@@ -375,22 +378,68 @@ Object {
         //! Kinematic chain: maps child_link -> { joint_name, joint_type, parent_link }
         property var kinematicChain: ({})
 
-        property var moveGroupClient: {
-            const actionName = root.namespace ? root.namespace + "/move_action" : "/move_action";
-            return Ros2.createActionClient(actionName, "moveit_msgs/action/MoveGroup");
+        property var moveGroupClient: root.actionServer
+            ? Ros2.createActionClient(root.actionServer, "moveit_msgs/action/MoveGroup")
+            : null
+
+        //! Namespace derived from the selected action server path
+        property string namespace: {
+            if (!root.actionServer)
+                return "";
+            const lastSlash = root.actionServer.lastIndexOf("/");
+            if (lastSlash <= 0)
+                return "";
+            return root.actionServer.substring(0, lastSlash);
         }
 
         function updateTopics() {
+            // Discover MoveGroup action servers
+            const allActions = Ros2.queryActions();
+            let moveGroupActions = [];
+            for (let i = 0; i < allActions.length; i++) {
+                const types = Ros2.getActionTypes(allActions[i]);
+                for (let j = 0; j < types.length; j++) {
+                    if (types[j] === "moveit_msgs/action/MoveGroup") {
+                        moveGroupActions.push(allActions[i]);
+                        break;
+                    }
+                }
+            }
+            moveGroupActions.sort();
+
+            // Update action servers model if changed
+            let changed = moveGroupActions.length !== root.actionServers.count;
+            if (!changed) {
+                for (let i = 0; i < moveGroupActions.length; i++) {
+                    if (root.actionServers.get(i).name !== moveGroupActions[i]) {
+                        changed = true;
+                        break;
+                    }
+                }
+            }
+            if (changed) {
+                root.actionServers.clear();
+                for (let i = 0; i < moveGroupActions.length; i++) {
+                    root.actionServers.append({ name: moveGroupActions[i] });
+                }
+            }
+
+            if (!root.actionServer)
+                return;
+
+            // Find topics using namespace derived from the action server path
+            const ns = namespace;
+
             // Find joint_states topic
             const jointStateTopics = Ros2.queryTopics("sensor_msgs/msg/JointState");
-            let bestJointState = _findBestTopic(jointStateTopics, "/joint_states");
+            let bestJointState = _findBestTopic(jointStateTopics, "/joint_states", ns);
             if (bestJointState !== jointStateTopic) {
                 jointStateTopic = bestJointState;
             }
 
             // Find robot_description topic
             const stringTopics = Ros2.queryTopics("std_msgs/msg/String");
-            let bestUrdf = _findBestTopic(stringTopics, "/robot_description");
+            let bestUrdf = _findBestTopic(stringTopics, "/robot_description", ns);
             if (bestUrdf && bestUrdf !== urdfTopic) {
                 root.joints.clear();
                 root.hasRobotDescription = false;
@@ -398,7 +447,7 @@ Object {
             }
 
             // Find robot_description_semantic (SRDF) topic
-            let bestSrdf = _findBestTopic(stringTopics, "/robot_description_semantic");
+            let bestSrdf = _findBestTopic(stringTopics, "/robot_description_semantic", ns);
             if (bestSrdf && bestSrdf !== srdfTopic) {
                 root.moveGroups.clear();
                 root.namedPoses.clear();
@@ -411,9 +460,11 @@ Object {
          * Find the best matching topic for a given suffix.
          * When namespace is set, only matches topics within that namespace (no fallback).
          * When namespace is empty, prefers the shortest matching topic.
+         * @param topics Array of available topic names
+         * @param suffix The topic suffix to match (e.g., "/joint_states")
+         * @param ns The namespace to search within (e.g., "/athena")
          */
-        function _findBestTopic(topics, suffix) {
-            const ns = root.namespace || "";
+        function _findBestTopic(topics, suffix, ns) {
             let bestMatch = "";
 
             for (let i = 0; i < topics.length; i++) {
@@ -570,8 +621,8 @@ Object {
         }
     }
 
-    onNamespaceChanged: {
-        // Clear all state when namespace changes
+    onActionServerChanged: {
+        // Clear all state when action server changes
         root.joints.clear();
         root.moveGroups.clear();
         root.namedPoses.clear();
@@ -586,7 +637,7 @@ Object {
         d.urdfTopic = "";
         d.srdfTopic = "";
         d.jointStateTopic = "";
-        // Trigger immediate topic discovery for new namespace
+        // Trigger immediate topic discovery for new action server
         d.updateTopics();
     }
 

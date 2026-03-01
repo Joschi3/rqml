@@ -27,8 +27,8 @@ Rectangle {
 
     Component.onCompleted: {
         // Initialize context defaults
-        if (!context.namespace)
-            context.namespace = "";
+        if (!context.action_server)
+            context.action_server = "";
         if (!context.move_group)
             context.move_group = "";
         if (context.velocity_scale === undefined)
@@ -53,7 +53,7 @@ Rectangle {
         property bool showError: false
 
         property var moveItInterface: MoveItInterface {
-            namespace: context.namespace || ""
+            actionServer: context.action_server || ""
             moveGroupName: context.move_group || ""
 
             onMotionFailed: function(title, details) {
@@ -89,11 +89,11 @@ Rectangle {
         columnSpacing: 8
 
         // --------------------------------------------------------------------
-        // Namespace Selection
+        // Action Server Selection
         // --------------------------------------------------------------------
 
         Label {
-            text: "Namespace"
+            text: "Action Server"
         }
 
         RowLayout {
@@ -101,40 +101,22 @@ Rectangle {
             Layout.fillWidth: true
 
             ComboBox {
-                id: namespaceComboBox
+                id: actionServerComboBox
                 Layout.fillWidth: true
-                editable: true
-                editText: context.namespace || ""
+                model: d.moveItInterface.actionServers
+                textRole: "name"
 
-                property var d_namespaces: {
-                    // Query topics to find available namespaces
-                    const topics = Ros2.queryTopics("std_msgs/msg/String");
-                    let namespaces = [""];
-
-                    for (let i = 0; i < topics.length; i++) {
-                        if (topics[i].endsWith("/robot_description_semantic")) {
-                            let ns = topics[i].replace("/robot_description_semantic", "");
-                            if (ns && namespaces.indexOf(ns) === -1) {
-                                namespaces.push(ns);
-                            }
-                        }
+                currentIndex: {
+                    for (let i = 0; i < d.moveItInterface.actionServers.count; i++) {
+                        if (d.moveItInterface.actionServers.get(i).name === context.action_server)
+                            return i;
                     }
-                    return namespaces;
-                }
-
-                Component.onCompleted: {
-                    model = d_namespaces;
-                }
-
-                onEditTextChanged: {
-                    if (editText !== context.namespace) {
-                        context.namespace = editText;
-                    }
+                    return -1;
                 }
 
                 onCurrentTextChanged: {
-                    if (currentText !== context.namespace) {
-                        context.namespace = currentText;
+                    if (currentText && currentText !== context.action_server) {
+                        context.action_server = currentText;
                     }
                 }
             }
@@ -142,7 +124,6 @@ Rectangle {
             RefreshButton {
                 onClicked: {
                     animate = true;
-                    namespaceComboBox.model = namespaceComboBox.d_namespaces;
                     d.moveItInterface.refresh();
                     animate = false;
                 }
@@ -220,8 +201,8 @@ Rectangle {
             Layout.columnSpan: 3
             Layout.fillWidth: true
             Layout.preferredHeight: errorBannerColumn.implicitHeight + 12
-            color: "#fff3cd"
-            border.color: "#856404"
+            color: palette.toolTipBase
+            border.color: palette.toolTipText
             border.width: 1
             radius: 4
             visible: d.showError
@@ -238,7 +219,7 @@ Rectangle {
                     Label {
                         text: d.errorTitle
                         font.bold: true
-                        color: "#856404"
+                        color: palette.toolTipText
                     }
 
                     Item { Layout.fillWidth: true }
@@ -255,7 +236,7 @@ Rectangle {
                 Label {
                     Layout.fillWidth: true
                     text: d.errorDetails
-                    color: "#856404"
+                    color: palette.toolTipText
                     wrapMode: Text.WordWrap
                     visible: d.errorDetails !== ""
                 }
