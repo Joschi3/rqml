@@ -17,6 +17,7 @@
 
 import QtQuick
 import QtQuick.Controls
+import RQml.Fonts
 
 // A TextField with a fuzzy-filtered dropdown.
 //
@@ -102,6 +103,37 @@ Item {
         anchors.fill: parent
         placeholderText: control.placeholderText
         selectByMouse: true
+        rightPadding: chevron.width + 12
+
+        onActiveFocusChanged: {
+            if (activeFocus && !popup.visible && control.filteredItems.length > 0)
+                popup.open();
+        }
+
+        Text {
+            id: chevron
+            anchors.right: parent.right
+            anchors.rightMargin: 8
+            anchors.verticalCenter: parent.verticalCenter
+            font.family: IconFont.name
+            text: IconFont.iconChevronDown
+            color: field.palette.text
+            opacity: chevronMouseArea.pressed ? 0.7 : (chevronMouseArea.containsMouse ? 1.0 : 0.5)
+
+            MouseArea {
+                id: chevronMouseArea
+                anchors.fill: parent
+                hoverEnabled: true
+                onClicked: {
+                    if (popup.visible) {
+                        popup.close();
+                    } else {
+                        field.forceActiveFocus();
+                        popup.open();
+                    }
+                }
+            }
+        }
 
         onTextEdited: {
             control.text = text;
