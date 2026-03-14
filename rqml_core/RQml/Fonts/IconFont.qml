@@ -22,6 +22,7 @@ FontLoader {
   source: "./Font Awesome 7 Free-Solid-900.otf"
 
   readonly property string iconAdd: "\x2b"
+  readonly property string iconChevronDown: "\uf078"
   readonly property string iconDebug: "\uf188"
   readonly property string iconEdit: "\uf044"
   readonly property string iconError: "\uf057"
