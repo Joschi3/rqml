@@ -21,14 +21,17 @@ import QtQuick
 FontLoader {
   source: "./Font Awesome 7 Free-Solid-900.otf"
 
+  // Icon mappings sorted alphabetically (please keep it that way)
   readonly property string iconAdd: "\x2b"
   readonly property string iconChevronDown: "\uf078"
+  readonly property string iconChevronRight: "\uf054"
   readonly property string iconDebug: "\uf188"
   readonly property string iconEdit: "\uf044"
   readonly property string iconError: "\uf057"
   readonly property string iconFatal: "\uf714"
   readonly property string iconFilter: "\uf0b0"
   readonly property string iconInfo: "\uf05a"
+  readonly property string iconLoad: "\uf56f"
   readonly property string iconPause: "\uf04c"
   readonly property string iconPlay: "\uf04b"
   readonly property string iconRefresh: "\uf021"
@@ -36,6 +39,7 @@ FontLoader {
   readonly property string iconRotateRight: "\uf01e"
   readonly property string iconSave: "\uf0c7"
   readonly property string iconSettings: "\uf013"
+  readonly property string iconStar: "\uf005"
   readonly property string iconTrash: "\uf1f8"
   readonly property string iconWarning: "\uf071"
 }
