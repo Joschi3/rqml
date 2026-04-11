@@ -1,6 +1,9 @@
 import QtQuick
 import QtQuick.Controls
+import QtQuick.Controls.Material
 import Ros2
+import RQml.Elements
+import RQml.Fonts
 
 /**
  * Interactive graph visualization for TF frames.
@@ -17,16 +20,15 @@ Item {
     property real staleThreshold: 5.0
 
     //! Semantic status colors (set by parent to avoid duplication)
-    property color freshColor: "#2ecc71"
-    property color staticColor: "#3498db"
-    property color staleColor: "#e74c3c"
+    property color freshColor: Material.color(Material.Green)
+    property color staticColor: Material.color(Material.Blue)
+    property color staleColor: Material.color(Material.Red)
 
     //! Layout direction: true = left-to-right, false = top-to-bottom
     property bool horizontal: true
 
     //! Node styling derived from palette
-    property color nodeTextColor: "#ffffff"
-    property color edgeColor: "#f39c12"
+    property color edgeColor: Material.color(Material.Orange)
     property int nodeWidth: 160
     property int nodeHeight: 28
     property int levelSpacing: 30
@@ -216,7 +218,7 @@ Item {
          */
         function getNodeColor(node) {
             if (node.updateCount === 0)
-                return "#9b59b6";
+                return Material.color(Material.Purple);
             if (!node.isStatic && node.age > root.staleThreshold)
                 return root.staleColor;
             if (node.isStatic)
@@ -399,13 +401,14 @@ Item {
 
                 // Highlight border
                 if (isHovered || isSelected) {
-                    ctx.strokeStyle = isSelected ? "#f1c40f" : "#ffffff";
+                    ctx.strokeStyle = isSelected ? Material.color(Material.Yellow) : "#ffffff";
                     ctx.lineWidth = 3 / d.scale;
                     ctx.stroke();
                 }
 
                 // Node text (fixed size in graph coordinates, scales with zoom)
-                ctx.fillStyle = nodeTextColor;
+                const nodeColor = Qt.color(ctx.fillStyle);
+                ctx.fillStyle = nodeColor.hslLightness > 0.5 ? "#000000" : "#ffffff";
                 ctx.font = "bold 11px sans-serif";
                 ctx.textAlign = "center";
                 ctx.textBaseline = "middle";
@@ -598,47 +601,36 @@ Item {
     Row {
         anchors.right: parent.right
         anchors.bottom: parent.bottom
-        anchors.margins: 8
         spacing: 4
 
-        Button {
-            width: 32
-            height: 32
-            text: "+"
+        IconButton {
+            text: IconFont.iconMagnifyingGlassPlus
+            tooltipText: "Zoom in"
             onClicked: {
                 d.scale = Math.min(3.0, d.scale * 1.2);
                 canvas.requestPaint();
             }
         }
 
-        Button {
-            width: 32
-            height: 32
-            text: "-"
+        IconButton {
+            text: IconFont.iconMagnifyingGlassMinus
+            tooltipText: "Zoom out"
             onClicked: {
                 d.scale = Math.max(0.1, d.scale / 1.2);
                 canvas.requestPaint();
             }
         }
 
-        Button {
-            width: 32
-            height: 32
-            text: "\u2302"  // Home symbol
+        IconButton {
+            text: IconFont.iconExpand
+            tooltipText: "Fit to view"
             onClicked: root.fitToView()
-
-            ToolTip.visible: hovered
-            ToolTip.text: "Fit to view"
         }
 
-        Button {
-            width: 32
-            height: 32
-            text: root.horizontal ? "\u2194" : "\u2195"  // ↔ or ↕
+        IconButton {
+            text: root.horizontal ? IconFont.iconArrowsUpDown : IconFont.iconArrowsLeftRight
+            tooltipText: root.horizontal ? "Switch to vertical layout" : "Switch to horizontal layout"
             onClicked: root.horizontal = !root.horizontal
-
-            ToolTip.visible: hovered
-            ToolTip.text: root.horizontal ? "Switch to vertical layout" : "Switch to horizontal layout"
         }
     }
 
@@ -649,9 +641,8 @@ Item {
     Rectangle {
         anchors.left: parent.left
         anchors.bottom: parent.bottom
-        anchors.margins: 8
-        width: legendColumn.width + 16
-        height: legendColumn.height + 16
+        width: legendColumn.width + 24
+        height: legendColumn.height + 24
         color: Qt.rgba(palette.base.r, palette.base.g, palette.base.b, 0.9)
         radius: 4
         border.color: palette.mid
@@ -660,24 +651,24 @@ Item {
         Column {
             id: legendColumn
             anchors.centerIn: parent
-            spacing: 4
+            spacing: 8
 
             Row {
                 spacing: 8
-                Rectangle { width: 12; height: 12; radius: 2; color: root.freshColor }
-                Label { text: "Dynamic"; font.pixelSize: 11 }
+                Rectangle { width: 16; height: 16; radius: 3; color: root.freshColor; anchors.verticalCenter: parent.verticalCenter }
+                Label { text: "Dynamic"; anchors.verticalCenter: parent.verticalCenter }
             }
 
             Row {
                 spacing: 8
-                Rectangle { width: 12; height: 12; radius: 2; color: root.staticColor }
-                Label { text: "Static"; font.pixelSize: 11 }
+                Rectangle { width: 16; height: 16; radius: 3; color: root.staticColor; anchors.verticalCenter: parent.verticalCenter }
+                Label { text: "Static"; anchors.verticalCenter: parent.verticalCenter }
             }
 
             Row {
                 spacing: 8
-                Rectangle { width: 12; height: 12; radius: 2; color: root.staleColor }
-                Label { text: "Stale (>" + root.staleThreshold + "s)"; font.pixelSize: 11 }
+                Rectangle { width: 16; height: 16; radius: 3; color: root.staleColor; anchors.verticalCenter: parent.verticalCenter }
+                Label { text: "Stale (>" + root.staleThreshold + "s)"; anchors.verticalCenter: parent.verticalCenter }
             }
         }
     }

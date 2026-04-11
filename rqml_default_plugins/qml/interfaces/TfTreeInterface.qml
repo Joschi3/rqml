@@ -387,6 +387,7 @@ Object {
     Subscription {
         id: tfSubscription
         topic: root.enabled ? d.getTfTopic() : ""
+        messageType: "tf2_msgs/msg/TFMessage"
         onNewMessage: function(msg) {
             if (!root.enabled)
                 return;
@@ -397,6 +398,7 @@ Object {
     Subscription {
         id: tfStaticSubscription
         topic: root.enabled && !d.resubscribing ? d.getTfStaticTopic() : ""
+        messageType: "tf2_msgs/msg/TFMessage"
         qos: Ros2.QoS().reliable().transient_local().keep_last(500)
         // Disable throttling to receive all latched messages from multiple publishers
         throttleRate: 0

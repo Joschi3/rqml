@@ -4,6 +4,7 @@ import QtQuick.Layouts
 import Ros2
 import RQml.Elements
 import RQml.Fonts
+import QtQuick.Controls.Material
 import "interfaces"
 import "elements"
 
@@ -38,10 +39,10 @@ Rectangle {
     readonly property real staleThreshold: 5.0
 
     //! Semantic status colors shared with sub-components
-    readonly property color freshColor: "#2ecc71"
-    readonly property color staticColor: "#3498db"
-    readonly property color staleColor: "#e74c3c"
-    readonly property color warningColor: "#f39c12"
+    readonly property color freshColor: Material.color(Material.Green)
+    readonly property color staticColor: Material.color(Material.Blue)
+    readonly property color staleColor: Material.color(Material.Red)
+    readonly property color warningColor: Material.color(Material.Orange)
 
     // ========================================================================
     // Private Data
@@ -152,6 +153,7 @@ Rectangle {
 
             ComboBox {
                 id: namespaceComboBox
+                objectName: "tfNamespaceComboBox"
                 Layout.fillWidth: true
                 model: d.namespaces
 
@@ -166,6 +168,7 @@ Rectangle {
             }
 
             RefreshButton {
+                objectName: "tfRefreshButton"
                 onClicked: {
                     animate = true;
                     d.refresh();
@@ -183,6 +186,7 @@ Rectangle {
             spacing: 8
 
             Label {
+                objectName: "tfFrameCountLabel"
                 text: "Frames: " + d.tfInterface.frameCount
                 font.bold: true
             }
@@ -195,6 +199,7 @@ Rectangle {
             }
 
             Button {
+                objectName: "tfGraphModeButton"
                 text: "Graph"
                 checkable: true
                 checked: context.viewMode === "graph"
@@ -203,6 +208,7 @@ Rectangle {
             }
 
             Button {
+                objectName: "tfListModeButton"
                 text: "List"
                 checkable: true
                 checked: context.viewMode === "list"
@@ -213,6 +219,7 @@ Rectangle {
             Item { width: 8 }
 
             IconToggleButton {
+                objectName: "tfEnableToggle"
                 iconOn: IconFont.iconPause
                 iconOff: IconFont.iconPlay
                 tooltipTextOn: "Click to pause"
@@ -224,6 +231,7 @@ Rectangle {
             }
 
             IconButton {
+                objectName: "tfClearButton"
                 text: IconFont.iconTrash
                 tooltipText: "Clear all data"
                 onClicked: d.tfInterface.clear()
@@ -235,6 +243,7 @@ Rectangle {
         // --------------------------------------------------------------------
 
         StackLayout {
+            objectName: "tfViewStack"
             Layout.fillWidth: true
             Layout.fillHeight: true
             currentIndex: context.viewMode === "graph" ? 0 : 1
@@ -252,6 +261,7 @@ Rectangle {
             // List View
             ListView {
                 id: frameListView
+                objectName: "tfFrameListView"
                 clip: true
                 model: d.tfInterface.frames
                 reuseItems: true
@@ -350,6 +360,7 @@ Rectangle {
                                     horizontalAlignment: Text.AlignHCenter
 
                                     MouseArea {
+                                        objectName: "tfBranchIndicatorArea"
                                         anchors.fill: parent
                                         anchors.margins: -4  // Larger click area
                                         enabled: model.hasChildren
@@ -439,13 +450,16 @@ Rectangle {
 
                         Menu {
                             id: contextMenu
+                            objectName: "tfContextMenu"
 
-                            Action {
+                            MenuItem {
+                                objectName: "tfCopyFrameIdAction"
                                 text: "Copy Frame ID"
                                 onTriggered: RQml.copyTextToClipboard(model.frameId)
                             }
 
-                            Action {
+                            MenuItem {
+                                objectName: "tfCopyParentIdAction"
                                 text: "Copy Parent ID"
                                 enabled: model.parentId !== ""
                                 onTriggered: RQml.copyTextToClipboard(model.parentId)
@@ -453,7 +467,8 @@ Rectangle {
 
                             MenuSeparator {}
 
-                            Action {
+                            MenuItem {
+                                objectName: "tfCopyTransformAction"
                                 text: "Copy Transform"
                                 enabled: model.updateCount > 0
                                 onTriggered: {
@@ -471,6 +486,7 @@ Rectangle {
 
                 // Empty state
                 Label {
+                    objectName: "tfEmptyStateLabel"
                     anchors.centerIn: parent
                     visible: d.tfInterface.frameCount === 0
                     text: context.enabled
@@ -492,15 +508,12 @@ Rectangle {
 
             Label {
                 text: "Root frames: " + d.tfInterface.rootFrames.length
-                color: palette.mid
             }
 
             Item { Layout.fillWidth: true }
 
             Label {
                 text: "Topics: " + (context.namespace || "") + "/tf, " + (context.namespace || "") + "/tf_static"
-                color: palette.mid
-                font.pixelSize: 11
             }
         }
     }
