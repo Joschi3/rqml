@@ -21,10 +21,9 @@ import RQml.Fonts
 
 RoundButton {
   id: control
-  implicitHeight: 48
-  implicitWidth: 48
+  implicitWidth: implicitHeight
   font.family: IconFont.name
-  font.pixelSize: 20
+  font.pixelSize: 18
   text: IconFont.iconRefresh
   radius: 4
   property bool animate
@@ -37,11 +36,8 @@ RoundButton {
     anchors.centerIn: control
     width: Math.min(control.width - control.padding, control.height - control.padding)
     height: width
-    font.family: control.font.family
-    font.pointSize: 1000
+    font: control.font
     text: control.text
-    minimumPointSize: 4
-    fontSizeMode: Text.Fit
     horizontalAlignment: Text.AlignHCenter
     verticalAlignment: Text.AlignVCenter
 

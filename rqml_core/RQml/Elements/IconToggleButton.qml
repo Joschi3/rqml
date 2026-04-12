@@ -7,10 +7,9 @@ RoundButton {
     property string tooltipTextOn
     property string tooltipTextOff
 
-    implicitWidth: 48
-    implicitHeight: 48
+    implicitWidth: implicitHeight
     font.family: IconFont.name
-    font.pixelSize: 20
+    font.pixelSize: 18
     text: checked ? iconOn : iconOff
     checkable: true
     radius: 4

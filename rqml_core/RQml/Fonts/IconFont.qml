@@ -27,6 +27,8 @@ FontLoader {
   readonly property string iconArrowsUpDown: "\uf07d"
   readonly property string iconChevronDown: "\uf078"
   readonly property string iconChevronRight: "\uf054"
+  readonly property string iconClose: "\uf00d"
+  readonly property string iconCopy: "\uf0c5"
   readonly property string iconCrosshairs: "\uf05b"
   readonly property string iconDebug: "\uf188"
   readonly property string iconEdit: "\uf044"

@@ -407,7 +407,6 @@ Rectangle {
                             color: model.isStatic ? palette.mid : palette.text
                             verticalAlignment: Text.AlignVCenter
                             horizontalAlignment: Text.AlignRight
-                            font.pixelSize: 12
                         }
 
                         // Age column (fixed width, right aligned)

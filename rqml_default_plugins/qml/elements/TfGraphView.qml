@@ -589,7 +589,6 @@ Item {
                     const age = (Date.now() - tooltip.hoveredFrame.lastUpdate) / 1000.0;
                     return "Age: " + root.tfInterface.formatAge(age);
                 }
-                font.pixelSize: 13
             }
         }
     }
