@@ -47,8 +47,8 @@ Rectangle {
         // Initialize context defaults
         if (context.enabled === undefined)
             context.enabled = true;
-        if (context.maxSamples !== undefined)
-            d.maxSamples = context.maxSamples;
+        if (context.max_samples !== undefined)
+            d.maxSamples = context.max_samples;
         d.refresh();
     }
 
@@ -76,6 +76,7 @@ Rectangle {
 
             ComboBox {
                 id: controllerManagerComboBox
+                objectName: "rsControllerManagerComboBox"
                 Layout.fillWidth: true
                 model: d.controllerManagers
 
@@ -88,6 +89,7 @@ Rectangle {
             }
 
             RefreshButton {
+                objectName: "rsRefreshButton"
                 onClicked: {
                     animate = true;
                     d.refresh();
@@ -102,6 +104,7 @@ Rectangle {
             spacing: 8
 
             Label {
+                objectName: "rsSamplesLabel"
                 text: "Samples: " + d.totalSamples
                 font.pixelSize: 11
                 color: palette.mid
@@ -110,6 +113,7 @@ Rectangle {
             Rectangle { width: 1; height: 16; color: palette.mid; opacity: 0.5 }
 
             Label {
+                objectName: "rsElementsLabel"
                 text: d.elementsModel.count + " elements"
                 font.pixelSize: 11
                 color: palette.mid
@@ -118,6 +122,7 @@ Rectangle {
             Item { Layout.fillWidth: true }
 
             IconToggleButton {
+                objectName: "rsPauseToggle"
                 iconOn: IconFont.iconPause
                 iconOff: IconFont.iconPlay
                 tooltipTextOn: "Click to pause"
@@ -127,6 +132,7 @@ Rectangle {
             }
 
             IconButton {
+                objectName: "rsClearButton"
                 text: IconFont.iconTrash
                 tooltipText: "Clear data"
                 onClicked: d.clear()
@@ -135,6 +141,7 @@ Rectangle {
 
         // Waiting indicator
         Label {
+            objectName: "rsWaitingLabel"
             Layout.fillWidth: true
             visible: !d.topicAvailable && !!context.controller_manager_namespace && d.messageCount === 0
             text: "Waiting for statistics topic: " + (context.controller_manager_namespace || "") + _statisticsTopicSuffix
@@ -150,7 +157,8 @@ Rectangle {
             spacing: 4
 
             Label {
-                text: d.globalMin.toFixed(0) + " \u00b5s"
+                objectName: "rsScaleMinLabel"
+                text: d.formatTime(d.globalMin)
                 font.pixelSize: 10
                 color: palette.mid
             }
@@ -163,7 +171,8 @@ Rectangle {
             }
 
             Label {
-                text: d.globalMax.toFixed(0) + " \u00b5s"
+                objectName: "rsScaleMaxLabel"
+                text: d.formatTime(d.globalMax)
                 font.pixelSize: 10
                 color: palette.mid
             }
@@ -172,6 +181,7 @@ Rectangle {
         // Statistics list
         ListView {
             id: statsListView
+            objectName: "rsStatsListView"
             Layout.fillWidth: true
             Layout.fillHeight: true
             clip: true
@@ -258,32 +268,32 @@ Rectangle {
                         spacing: 0
 
                         Label {
-                            text: "min " + model.min.toFixed(1)
+                            text: "min " + d.formatTime(model.min)
                             font.pixelSize: 9
                             color: palette.mid
-                            Layout.preferredWidth: 70
+                            Layout.preferredWidth: 80
                         }
                         Label {
-                            text: "Q1 " + model.q1.toFixed(1)
+                            text: "Q1 " + d.formatTime(model.q1)
                             font.pixelSize: 9
                             color: palette.mid
-                            Layout.preferredWidth: 60
+                            Layout.preferredWidth: 80
                         }
                         Label {
-                            text: "med " + model.median.toFixed(1)
+                            text: "med " + d.formatTime(model.median)
                             font.pixelSize: 9
                             font.bold: true
                             color: "#E74C3C"
-                            Layout.preferredWidth: 70
+                            Layout.preferredWidth: 80
                         }
                         Label {
-                            text: "Q3 " + model.q3.toFixed(1)
+                            text: "Q3 " + d.formatTime(model.q3)
                             font.pixelSize: 9
                             color: palette.mid
-                            Layout.preferredWidth: 60
+                            Layout.preferredWidth: 80
                         }
                         Label {
-                            text: "max " + model.max.toFixed(1)
+                            text: "max " + d.formatTime(model.max)
                             font.pixelSize: 9
                             color: palette.mid
                         }
@@ -317,19 +327,21 @@ Rectangle {
 
             Slider {
                 id: sampleSizeSlider
+                objectName: "rsSampleSizeSlider"
                 Layout.fillWidth: true
                 from: 100
                 to: 10000
                 stepSize: 100
-                value: context.maxSamples ?? _defaultMaxSamples
+                value: context.max_samples ?? _defaultMaxSamples
 
                 onMoved: {
-                    context.maxSamples = value;
+                    context.max_samples = value;
                     d.setMaxSamples(value);
                 }
             }
 
             Label {
+                objectName: "rsSampleWindowLabel"
                 text: d.maxSamples + " samples"
                 font.pixelSize: 11
                 color: palette.mid
@@ -344,9 +356,11 @@ Rectangle {
 
     Subscription {
         id: statisticsSubscription
+        objectName: "rsStatisticsSubscription"
         topic: context.controller_manager_namespace
                ? context.controller_manager_namespace + _statisticsTopicSuffix
                : ""
+        messageType: "pal_statistics_msgs/msg/Statistics"
         throttleRate: 0
         enabled: !!(context.enabled ?? true) && topic !== ""
         onNewMessage: msg => d.processMessage(msg)
@@ -516,6 +530,18 @@ Rectangle {
         }
 
         /**
+         * Formats a time value in microseconds to a human-readable string
+         * with appropriate unit (us or ms).
+         */
+        function formatTime(us) {
+            if (us >= 1000)
+                return (us / 1000).toFixed(2) + " ms";
+            if (us >= 1)
+                return us.toFixed(1) + " \u00b5s";
+            return us.toFixed(2) + " \u00b5s";
+        }
+
+        /**
          * Calculates boxplot statistics for an array of samples.
          * Returns null if samples array is empty.
          */
@@ -612,6 +638,10 @@ Rectangle {
                     elementsModel.append(entry);
                 }
             }
+
+            // Remove stale trailing entries when elements have disappeared
+            while (elementsModel.count > elementOrder.length)
+                elementsModel.remove(elementsModel.count - 1);
         }
 
         /**
@@ -666,6 +696,7 @@ Rectangle {
          * Clears all collected data and resets state.
          */
         function clear() {
+            updateTimer.stop();
             elementData = {};
             elementOrder = [];
             messageCount = 0;
