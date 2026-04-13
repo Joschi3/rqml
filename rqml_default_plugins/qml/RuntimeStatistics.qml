@@ -107,7 +107,6 @@ Rectangle {
                 objectName: "rsSamplesLabel"
                 text: "Samples: " + d.totalSamples
                 font.pixelSize: 11
-                color: palette.mid
             }
 
             Rectangle { width: 1; height: 16; color: palette.mid; opacity: 0.5 }
@@ -116,7 +115,6 @@ Rectangle {
                 objectName: "rsElementsLabel"
                 text: d.elementsModel.count + " elements"
                 font.pixelSize: 11
-                color: palette.mid
             }
 
             Item { Layout.fillWidth: true }
@@ -145,7 +143,6 @@ Rectangle {
             Layout.fillWidth: true
             visible: !d.topicAvailable && !!context.controller_manager_namespace && d.messageCount === 0
             text: "Waiting for statistics topic: " + (context.controller_manager_namespace || "") + _statisticsTopicSuffix
-            color: palette.mid
             font.italic: true
             wrapMode: Text.WordWrap
         }
@@ -160,7 +157,6 @@ Rectangle {
                 objectName: "rsScaleMinLabel"
                 text: d.formatTime(d.globalMin)
                 font.pixelSize: 10
-                color: palette.mid
             }
 
             Rectangle {
@@ -174,7 +170,6 @@ Rectangle {
                 objectName: "rsScaleMaxLabel"
                 text: d.formatTime(d.globalMax)
                 font.pixelSize: 10
-                color: palette.mid
             }
         }
 
@@ -245,7 +240,6 @@ Rectangle {
                         Label {
                             text: "n=" + model.count
                             font.pixelSize: 10
-                            color: palette.mid
                         }
                     }
 
@@ -270,13 +264,11 @@ Rectangle {
                         Label {
                             text: "min " + d.formatTime(model.min)
                             font.pixelSize: 9
-                            color: palette.mid
                             Layout.preferredWidth: 80
                         }
                         Label {
                             text: "Q1 " + d.formatTime(model.q1)
                             font.pixelSize: 9
-                            color: palette.mid
                             Layout.preferredWidth: 80
                         }
                         Label {
@@ -289,13 +281,11 @@ Rectangle {
                         Label {
                             text: "Q3 " + d.formatTime(model.q3)
                             font.pixelSize: 9
-                            color: palette.mid
                             Layout.preferredWidth: 80
                         }
                         Label {
                             text: "max " + d.formatTime(model.max)
                             font.pixelSize: 9
-                            color: palette.mid
                         }
                         Item { Layout.fillWidth: true }
                     }
@@ -311,7 +301,6 @@ Rectangle {
             text: "No execution time data found in statistics messages."
             horizontalAlignment: Text.AlignHCenter
             verticalAlignment: Text.AlignVCenter
-            color: palette.mid
         }
 
         // Sample window slider (at bottom)
@@ -322,7 +311,6 @@ Rectangle {
             Label {
                 text: "Window:"
                 font.pixelSize: 11
-                color: palette.mid
             }
 
             Slider {
@@ -344,7 +332,6 @@ Rectangle {
                 objectName: "rsSampleWindowLabel"
                 text: d.maxSamples + " samples"
                 font.pixelSize: 11
-                color: palette.mid
                 Layout.preferredWidth: 80
             }
         }
