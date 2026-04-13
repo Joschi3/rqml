@@ -102,6 +102,7 @@ Rectangle {
 
             ComboBox {
                 id: actionServerComboBox
+                objectName: "moveitActionServerComboBox"
                 Layout.fillWidth: true
                 model: d.moveItInterface.actionServers
                 textRole: "name"
@@ -122,6 +123,7 @@ Rectangle {
             }
 
             RefreshButton {
+                objectName: "moveitRefreshButton"
                 onClicked: {
                     animate = true;
                     d.moveItInterface.refresh();
@@ -140,6 +142,7 @@ Rectangle {
 
         ComboBox {
             id: moveGroupComboBox
+            objectName: "moveitMoveGroupComboBox"
             Layout.columnSpan: 2
             Layout.fillWidth: true
             model: d.moveItInterface.moveGroups
@@ -172,6 +175,7 @@ Rectangle {
         }
 
         Flow {
+            objectName: "moveitNamedPosesFlow"
             Layout.columnSpan: 3
             Layout.fillWidth: true
             spacing: 4
@@ -198,6 +202,7 @@ Rectangle {
         // --------------------------------------------------------------------
 
         Rectangle {
+            objectName: "moveitErrorBannerRect"
             Layout.columnSpan: 3
             Layout.fillWidth: true
             Layout.preferredHeight: errorBannerColumn.implicitHeight + 12
@@ -217,6 +222,7 @@ Rectangle {
                     Layout.fillWidth: true
 
                     Label {
+                        objectName: "moveitErrorTitle"
                         text: d.errorTitle
                         font.bold: true
                         color: palette.toolTipText
@@ -234,6 +240,7 @@ Rectangle {
                 }
 
                 Label {
+                    objectName: "moveitErrorDetails"
                     Layout.fillWidth: true
                     text: d.errorDetails
                     color: palette.toolTipText
@@ -256,6 +263,7 @@ Rectangle {
 
         ListView {
             id: jointListView
+            objectName: "moveitJointListView"
             Layout.columnSpan: 3
             Layout.fillWidth: true
             Layout.fillHeight: true
@@ -328,6 +336,7 @@ Rectangle {
             visible: !!moveGroupComboBox.currentText
 
             Button {
+                objectName: "moveitResetButton"
                 Layout.fillWidth: true
                 Layout.margins: 4
                 text: "Reset"
@@ -339,6 +348,7 @@ Rectangle {
             }
 
             Button {
+                objectName: "moveitExecuteButton"
                 Layout.fillWidth: true
                 Layout.margins: 4
                 text: d.moveItInterface.isGoalActive ? "Cancel" : "Execute"
@@ -378,6 +388,7 @@ Rectangle {
             // Collapsible header (styled like a button)
             Button {
                 id: planningConfigHeaderButton
+                objectName: "moveitPlanningConfigButton"
                 Layout.fillWidth: true
                 Layout.margins: 4
                 flat: true
@@ -428,6 +439,7 @@ Rectangle {
 
                     Slider {
                         id: velocitySlider
+                        objectName: "moveitVelocitySlider"
                         Layout.fillWidth: true
                         from: 0.01
                         to: 1.0
@@ -453,6 +465,7 @@ Rectangle {
 
                     Slider {
                         id: accelerationSlider
+                        objectName: "moveitAccelerationSlider"
                         Layout.fillWidth: true
                         from: 0.01
                         to: 1.0
@@ -478,6 +491,7 @@ Rectangle {
 
                     Slider {
                         id: planningTimeSlider
+                        objectName: "moveitPlanningTimeSlider"
                         Layout.fillWidth: true
                         from: 1.0
                         to: 30.0
@@ -503,6 +517,7 @@ Rectangle {
 
                     Slider {
                         id: planningAttemptsSlider
+                        objectName: "moveitPlanningAttemptsSlider"
                         Layout.fillWidth: true
                         from: 1
                         to: 20
@@ -530,11 +545,13 @@ Rectangle {
             spacing: 16
 
             Label {
+                objectName: "moveitUrdfStatusLabel"
                 text: "URDF: " + (d.moveItInterface.hasRobotDescription ? "Loaded" : "Waiting...")
                 color: d.moveItInterface.hasRobotDescription ? palette.text : palette.mid
             }
 
             Label {
+                objectName: "moveitSrdfStatusLabel"
                 text: "SRDF: " + (d.moveItInterface.hasSrdf ? "Loaded" : "Waiting...")
                 color: d.moveItInterface.hasSrdf ? palette.text : palette.mid
             }
@@ -542,6 +559,7 @@ Rectangle {
             Item { Layout.fillWidth: true }
 
             Label {
+                objectName: "moveitActionStatusLabel"
                 text: "Action: " + (d.moveItInterface.actionReady ? "Ready" : "Connecting...")
                 color: d.moveItInterface.actionReady ? palette.text : palette.mid
             }
