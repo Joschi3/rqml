@@ -411,7 +411,6 @@ Rectangle {
 
                     Label {
                         text: "Vel: " + (velocitySlider.value * 100).toFixed(0) + "%, Acc: " + (accelerationSlider.value * 100).toFixed(0) + "%"
-                        color: palette.mid
                         visible: !planningConfigExpanded.expanded
                     }
                 }
@@ -547,13 +546,11 @@ Rectangle {
             Label {
                 objectName: "moveitUrdfStatusLabel"
                 text: "URDF: " + (d.moveItInterface.hasRobotDescription ? "Loaded" : "Waiting...")
-                color: d.moveItInterface.hasRobotDescription ? palette.text : palette.mid
             }
 
             Label {
                 objectName: "moveitSrdfStatusLabel"
                 text: "SRDF: " + (d.moveItInterface.hasSrdf ? "Loaded" : "Waiting...")
-                color: d.moveItInterface.hasSrdf ? palette.text : palette.mid
             }
 
             Item { Layout.fillWidth: true }
@@ -561,7 +558,6 @@ Rectangle {
             Label {
                 objectName: "moveitActionStatusLabel"
                 text: "Action: " + (d.moveItInterface.actionReady ? "Ready" : "Connecting...")
-                color: d.moveItInterface.actionReady ? palette.text : palette.mid
             }
         }
     }
