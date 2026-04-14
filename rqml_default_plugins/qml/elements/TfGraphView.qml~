@@ -14,43 +14,57 @@ import RQml.Fonts
 Item {
     id: root
 
-    //! Shared TfBuffer from the parent plugin
-    property var buffer: null
-
-    //! Node styling derived from palette
-    property color edgeColor: Material.color(Material.Orange)
-
-    //! Semantic status colors (set by parent to avoid duplication)
-    property color freshColor: Material.color(Material.Green)
-
-    //! Layout direction: true = left-to-right, false = top-to-bottom
-    property bool horizontal: true
-    property int levelSpacing: 30
-    property int nodeHeight: 28
-    property int nodeSpacing: 4
-    property int nodeWidth: 160
+    //! The TfTreeInterface providing frame data
+    property var tfInterface: null
 
     //! Currently selected source frame (empty = none)
     property string sourceFrame: ""
-    property color sourceFrameColor: Material.color(Material.Red, Material.Shade400)
-    property color staleColor: Material.color(Material.Red)
-
-    //! Age threshold (in seconds) after which a dynamic transform is considered stale
-    property real staleThreshold: 5.0
-    property color staticColor: Material.color(Material.Blue)
 
     //! Currently selected target frame (empty = none)
     property string targetFrame: ""
+
+    //! Age threshold (in seconds) after which a dynamic transform is considered stale
+    property real staleThreshold: 5.0
+
+    //! Semantic status colors (set by parent to avoid duplication)
+    property color freshColor: Material.color(Material.Green)
+    property color staticColor: Material.color(Material.Blue)
+    property color staleColor: Material.color(Material.Red)
+    property color sourceFrameColor: Material.color(Material.Red, Material.Shade400)
     property color targetFrameColor: Material.color(Material.Red, Material.Shade1000)
 
-    //! The TfTreeInterface providing frame data
-    property var tfInterface: null
+    //! Layout direction: true = left-to-right, false = top-to-bottom
+    property bool horizontal: true
 
     //! Signal emitted when a frame is clicked with modifiers
     signal selectFrame(string frameId, int modifiers)
 
     //! Signal emitted when the user requests swapping source and target
-    signal swapFrames
+    signal swapFrames()
+
+    //! Shared TfBuffer from the parent plugin
+    property var buffer: null
+
+    //! Node styling derived from palette
+    property color edgeColor: Material.color(Material.Orange)
+    property int nodeWidth: 160
+    property int nodeHeight: 28
+    property int levelSpacing: 30
+    property int nodeSpacing: 4
+
+    // ========================================================================
+    // Signals
+    // ========================================================================
+
+    onSourceFrameChanged: canvas.requestPaint()
+    onTargetFrameChanged: canvas.requestPaint()
+
+    // ========================================================================
+    // Public Functions
+    // ========================================================================
+
+    //! @internal Returns the TfTransform used by the transform panel. For test use.
+    function _testTfTransform() { return transformPanel._testTfTransform(); }
 
     //! @internal Returns {x, y} in screen coordinates for a given frame's
     //! centre, or null if not laid out. For test use.
@@ -59,21 +73,12 @@ Item {
             var p = d.nodePositions[i];
             if (p.frameId === frameId) {
                 return {
-                    "x": d.offsetX + (p.x + nodeWidth / 2) * d.scale,
-                    "y": d.offsetY + (p.y + nodeHeight / 2) * d.scale
+                    x: d.offsetX + (p.x + nodeWidth / 2) * d.scale,
+                    y: d.offsetY + (p.y + nodeHeight / 2) * d.scale
                 };
             }
         }
         return null;
-    }
-
-    // ========================================================================
-    // Public Functions
-    // ========================================================================
-
-    //! @internal Returns the TfTransform used by the transform panel. For test use.
-    function _testTfTransform() {
-        return transformPanel._testTfTransform();
     }
 
     /**
@@ -88,6 +93,7 @@ Item {
         // Find bounding box
         let minX = Infinity, minY = Infinity;
         let maxX = -Infinity, maxY = -Infinity;
+
         for (let i = 0; i < d.nodePositions.length; ++i) {
             const pos = d.nodePositions[i];
             minX = Math.min(minX, pos.x);
@@ -112,50 +118,26 @@ Item {
         d.scale = Math.max(0.1, Math.min(2.0, newScale));
         d.offsetX = -minX * d.scale + (root.width - (maxX - minX) * d.scale) / 2;
         d.offsetY = -minY * d.scale + (root.height - (maxY - minY) * d.scale) / 2;
-        canvas.requestPaint();
-    }
 
-    Component.onCompleted: {
-        if (tfInterface) {
-            d.calculateLayout();
-            canvas.requestPaint();
-            if (d.nodePositions.length > 0) {
-                root.fitToView();
-            }
-        }
-    }
-    onHorizontalChanged: {
-        d.calculateLayout();
-        root.fitToView();
-    }
-
-    // ========================================================================
-    // Signals
-    // ========================================================================
-    onSourceFrameChanged: canvas.requestPaint()
-    onTargetFrameChanged: canvas.requestPaint()
-    onTfInterfaceChanged: {
-        d.calculateLayout();
         canvas.requestPaint();
-        if (d.nodePositions.length > 0) {
-            root.fitToView();
-        }
     }
 
     // ========================================================================
     // Private Implementation
     // ========================================================================
+
     QtObject {
         id: d
 
-        //! Frame stashed when the right-click menu opens; independent of source/target
-        property string contextMenuFrame: ""
-        property var edges: []          // Array of {from, to, fromX, fromY, toX, toY}
-        property string hoveredNode: ""
-        property var nodePositions: []  // Array of {frameId, x, y, level, isStatic, age}
+        property real scale: 1.0
         property real offsetX: 50
         property real offsetY: 50
-        property real scale: 1.0
+        property var nodePositions: []  // Array of {frameId, x, y, level, isStatic, age}
+        property var edges: []          // Array of {from, to, fromX, fromY, toX, toY}
+        property string hoveredNode: ""
+        //! Frame stashed when the right-click menu opens; independent of source/target
+        property string contextMenuFrame: ""
+
 
         /**
          * Calculate layout for all frames.
@@ -170,6 +152,7 @@ Item {
                 d.edges = [];
                 return;
             }
+
             const positions = [];
             const edgeList = [];
             const framePos = {};     // frameId -> {x, y}
@@ -205,18 +188,17 @@ Item {
                 const centeredCross = crossPos + (mySpan - nodeCrossSize) / 2;
                 const x = horiz ? mainPos : centeredCross;
                 const y = horiz ? centeredCross : mainPos;
-                framePos[frameId] = {
-                    "x": x,
-                    "y": y
-                };
+                framePos[frameId] = { x: x, y: y };
+
                 const frame = root.tfInterface.getFrame(frameId);
                 positions.push({
-                        "frameId": frameId,
-                        "x": x,
-                        "y": y,
-                        "isStatic": frame ? frame.isStatic : false,
-                        "age": root.buffer ? root.buffer.getTransformAge(frameId) : -1
-                    });
+                    frameId: frameId,
+                    x: x,
+                    y: y,
+                    isStatic: frame ? frame.isStatic : false,
+                    age: root.buffer ? root.buffer.getTransformAge(frameId) : -1
+                });
+
                 const children = root.tfInterface.getChildren(frameId).slice().sort();
                 const childMain = mainPos + nodeMainSize + levelSpacing;
                 let childCross = crossPos;
@@ -231,12 +213,14 @@ Item {
             for (let i = 0; i < rootFrames.length; ++i) {
                 calcSpan(rootFrames[i]);
             }
+
             let totalCross = 0;
             for (let i = 0; i < rootFrames.length; ++i) {
                 if (i > 0)
                     totalCross += nodeSpacing * 5;
                 totalCross += subtreeSpan[rootFrames[i]];
             }
+
             let curCross = -totalCross / 2;
             for (let i = 0; i < rootFrames.length; ++i) {
                 if (i > 0)
@@ -254,41 +238,23 @@ Item {
                     if (horiz) {
                         // Right side of parent → left side of child
                         edgeList.push({
-                                "from": frame.parentId,
-                                "to": node.frameId,
-                                "fromX": pp.x + nodeWidth,
-                                "fromY": pp.y + nodeHeight / 2,
-                                "toX": node.x,
-                                "toY": node.y + nodeHeight / 2
-                            });
+                            from: frame.parentId, to: node.frameId,
+                            fromX: pp.x + nodeWidth,   fromY: pp.y + nodeHeight / 2,
+                            toX: node.x,                toY: node.y + nodeHeight / 2
+                        });
                     } else {
                         // Bottom of parent → top of child
                         edgeList.push({
-                                "from": frame.parentId,
-                                "to": node.frameId,
-                                "fromX": pp.x + nodeWidth / 2,
-                                "fromY": pp.y + nodeHeight,
-                                "toX": node.x + nodeWidth / 2,
-                                "toY": node.y
-                            });
+                            from: frame.parentId, to: node.frameId,
+                            fromX: pp.x + nodeWidth / 2, fromY: pp.y + nodeHeight,
+                            toX: node.x + nodeWidth / 2, toY: node.y
+                        });
                     }
                 }
             }
+
             d.nodePositions = positions;
             d.edges = edgeList;
-        }
-
-        /**
-         * Find node at graph coordinates.
-         */
-        function findNodeAt(graphX, graphY) {
-            for (let i = d.nodePositions.length - 1; i >= 0; --i) {
-                const node = d.nodePositions[i];
-                if (graphX >= node.x && graphX <= node.x + nodeWidth && graphY >= node.y && graphY <= node.y + nodeHeight) {
-                    return node.frameId;
-                }
-            }
-            return "";
         }
 
         /**
@@ -309,16 +275,32 @@ Item {
          */
         function screenToGraph(screenX, screenY) {
             return {
-                "x": (screenX - d.offsetX) / d.scale,
-                "y": (screenY - d.offsetY) / d.scale
+                x: (screenX - d.offsetX) / d.scale,
+                y: (screenY - d.offsetY) / d.scale
             };
+        }
+
+        /**
+         * Find node at graph coordinates.
+         */
+        function findNodeAt(graphX, graphY) {
+            for (let i = d.nodePositions.length - 1; i >= 0; --i) {
+                const node = d.nodePositions[i];
+                if (graphX >= node.x && graphX <= node.x + nodeWidth &&
+                    graphY >= node.y && graphY <= node.y + nodeHeight) {
+                    return node.frameId;
+                }
+            }
+            return "";
         }
     }
 
     // ========================================================================
     // Layout Update
     // ========================================================================
+
     Connections {
+        target: root.tfInterface
         function onTreeChanged() {
             const prevCount = d.nodePositions.length;
             d.calculateLayout();
@@ -328,14 +310,35 @@ Item {
                 root.fitToView();
             }
         }
-
-        target: root.tfInterface
     }
+
+    onHorizontalChanged: {
+        d.calculateLayout();
+        root.fitToView();
+    }
+
+    onTfInterfaceChanged: {
+        d.calculateLayout();
+        canvas.requestPaint();
+        if (d.nodePositions.length > 0) {
+            root.fitToView();
+        }
+    }
+
+    Component.onCompleted: {
+        if (tfInterface) {
+            d.calculateLayout();
+            canvas.requestPaint();
+            if (d.nodePositions.length > 0) {
+                root.fitToView();
+            }
+        }
+    }
+
     Timer {
         interval: 1000
-        repeat: true
         running: root.tfInterface && root.tfInterface.hasData
-
+        repeat: true
         onTriggered: {
             d.calculateLayout();
             canvas.requestPaint();
@@ -345,6 +348,7 @@ Item {
     // ========================================================================
     // Canvas Rendering
     // ========================================================================
+
     Canvas {
         id: canvas
         anchors.fill: parent
@@ -354,6 +358,7 @@ Item {
             ctx.reset();
             ctx.fillStyle = palette.base;
             ctx.fillRect(0, 0, width, height);
+
             if (d.nodePositions.length === 0) {
                 // Draw empty state message
                 ctx.fillStyle = palette.mid;
@@ -362,6 +367,7 @@ Item {
                 ctx.fillText("No TF data", width / 2, height / 2);
                 return;
             }
+
             ctx.save();
             ctx.translate(d.offsetX, d.offsetY);
             ctx.scale(d.scale, d.scale);
@@ -371,8 +377,10 @@ Item {
             ctx.lineWidth = 2 / d.scale;
             const arrowSize = 7;
             const arrowWidth = arrowSize * 0.5;
+
             for (let i = 0; i < d.edges.length; ++i) {
                 const edge = d.edges[i];
+
                 if (root.horizontal) {
                     // Horizontal: arrow pointing right
                     const arrowBaseX = edge.toX - arrowSize;
@@ -381,6 +389,7 @@ Item {
                     const midX = (edge.fromX + arrowBaseX) / 2;
                     ctx.bezierCurveTo(midX, edge.fromY, midX, edge.toY, arrowBaseX, edge.toY);
                     ctx.stroke();
+
                     ctx.beginPath();
                     ctx.moveTo(edge.toX, edge.toY);
                     ctx.lineTo(arrowBaseX, edge.toY - arrowWidth);
@@ -396,6 +405,7 @@ Item {
                     const midY = (edge.fromY + arrowBaseY) / 2;
                     ctx.bezierCurveTo(edge.fromX, midY, edge.toX, midY, edge.toX, arrowBaseY);
                     ctx.stroke();
+
                     ctx.beginPath();
                     ctx.moveTo(edge.toX, edge.toY);
                     ctx.lineTo(edge.toX - arrowWidth, arrowBaseY);
@@ -419,6 +429,7 @@ Item {
                 const y = node.y;
                 const w = nodeWidth;
                 const h = nodeHeight;
+
                 ctx.fillStyle = d.getNodeColor(node);
                 ctx.beginPath();
                 ctx.moveTo(x + r, y);
@@ -468,16 +479,17 @@ Item {
                     ctx.font = "bold 14px sans-serif";
                     ctx.textAlign = "right";
                     ctx.textBaseline = "alphabetic";
-                    ctx.beginPath();
-                    ctx.arc(node.x + nodeWidth - 4, node.y + nodeHeight - 5, 8, 0, 360);
-                    ctx.closePath();
+                    ctx.beginPath()
+                    ctx.arc(node.x + nodeWidth - 4, node.y + nodeHeight - 5, 8, 0, 360)
+                    ctx.closePath()
                     const glyphBgColor = isSource ? root.sourceFrameColor : root.targetFrameColor;
-                    ctx.fillStyle = glyphBgColor;
-                    ctx.fill();
+                    ctx.fillStyle = glyphBgColor
+                    ctx.fill()
                     ctx.fillStyle = glyphBgColor.hslLightness > 0.75 ? "#000000" : "#ffffff";
                     ctx.fillText(isSource ? "S" : "T", node.x + nodeWidth, node.y + nodeHeight);
                 }
             }
+
             ctx.restore();
         }
     }
@@ -485,24 +497,42 @@ Item {
     // ========================================================================
     // Mouse Interaction
     // ========================================================================
+
     MouseArea {
         id: mouseArea
-
-        property bool isPanning: false
-        property real lastX: 0
-        property real lastY: 0
-
-        acceptedButtons: Qt.LeftButton | Qt.RightButton
         anchors.fill: parent
         hoverEnabled: true
+        acceptedButtons: Qt.LeftButton | Qt.RightButton
 
-        onDoubleClicked: mouse => {
+        property real lastX: 0
+        property real lastY: 0
+        property bool isPanning: false
+
+        onPressed: mouse => {
+            lastX = mouse.x;
+            lastY = mouse.y;
+
             const graphPos = d.screenToGraph(mouse.x, mouse.y);
             const nodeId = d.findNodeAt(graphPos.x, graphPos.y);
-            if (nodeId === "") {
-                root.fitToView();
+
+            if (mouse.button === Qt.LeftButton) {
+                if (nodeId === "") {
+                    isPanning = true;
+                    return;
+                }
+                root.selectFrame(nodeId, mouse.modifiers);
+                canvas.requestPaint();
+            } else if (mouse.button === Qt.RightButton && nodeId !== "") {
+                d.contextMenuFrame = nodeId;
+                tooltip.close();
+                nodeContextMenu.popup();
             }
         }
+
+        onReleased: {
+            isPanning = false;
+        }
+
         onPositionChanged: mouse => {
             // Update hover state
             const graphPos = d.screenToGraph(mouse.x, mouse.y);
@@ -521,27 +551,7 @@ Item {
                 canvas.requestPaint();
             }
         }
-        onPressed: mouse => {
-            lastX = mouse.x;
-            lastY = mouse.y;
-            const graphPos = d.screenToGraph(mouse.x, mouse.y);
-            const nodeId = d.findNodeAt(graphPos.x, graphPos.y);
-            if (mouse.button === Qt.LeftButton) {
-                if (nodeId === "") {
-                    isPanning = true;
-                    return;
-                }
-                root.selectFrame(nodeId, mouse.modifiers);
-                canvas.requestPaint();
-            } else if (mouse.button === Qt.RightButton && nodeId !== "") {
-                d.contextMenuFrame = nodeId;
-                tooltip.close();
-                nodeContextMenu.popup();
-            }
-        }
-        onReleased: {
-            isPanning = false;
-        }
+
         onWheel: wheel => {
             const zoomFactor = wheel.angleDelta.y > 0 ? 1.1 : 0.9;
             const newScale = Math.max(0.1, Math.min(3.0, d.scale * zoomFactor));
@@ -552,28 +562,39 @@ Item {
             d.offsetX = mouseX - (mouseX - d.offsetX) * (newScale / d.scale);
             d.offsetY = mouseY - (mouseY - d.offsetY) * (newScale / d.scale);
             d.scale = newScale;
+
             canvas.requestPaint();
+        }
+
+        onDoubleClicked: mouse => {
+            const graphPos = d.screenToGraph(mouse.x, mouse.y);
+            const nodeId = d.findNodeAt(graphPos.x, graphPos.y);
+            if (nodeId === "") {
+                root.fitToView();
+            }
         }
     }
 
     // ========================================================================
     // Context Menu
     // ========================================================================
+
     Menu {
         id: nodeContextMenu
 
         // Cache the right-clicked frame to avoid repeated lookups
-        property var selectedFrame: d.contextMenuFrame && root.tfInterface ? root.tfInterface.getFrame(d.contextMenuFrame) : null
+        property var selectedFrame: d.contextMenuFrame && root.tfInterface
+            ? root.tfInterface.getFrame(d.contextMenuFrame)
+            : null
 
         Action {
             text: "Copy Frame ID"
-
             onTriggered: RQml.copyTextToClipboard(d.contextMenuFrame)
         }
-        Action {
-            enabled: nodeContextMenu.selectedFrame && nodeContextMenu.selectedFrame.parentId !== ""
-            text: "Copy Parent ID"
 
+        Action {
+            text: "Copy Parent ID"
+            enabled: nodeContextMenu.selectedFrame && nodeContextMenu.selectedFrame.parentId !== ""
             onTriggered: {
                 if (nodeContextMenu.selectedFrame)
                     RQml.copyTextToClipboard(nodeContextMenu.selectedFrame.parentId);
@@ -584,35 +605,54 @@ Item {
     // ========================================================================
     // Tooltip
     // ========================================================================
+
     ToolTip {
         id: tooltip
-
-        // Cache the hovered frame to avoid repeated lookups
-        property var hoveredFrame: d.hoveredNode && root.tfInterface ? root.tfInterface.getFrame(d.hoveredNode) : null
-
-        delay: 0
         objectName: "tooltip"
+        delay: 0
         timeout: -1
         x: mouseArea.mouseX + 15
         y: mouseArea.mouseY + 15
+
+        // Show/hide immediately without fade animation
+        enter: Transition {}
+        exit: Transition {}
+
+        // Cache the hovered frame to avoid repeated lookups
+        property var hoveredFrame: d.hoveredNode && root.tfInterface
+            ? root.tfInterface.getFrame(d.hoveredNode)
+            : null
+
+        // Open/close explicitly so no ghost rectangle lingers
+        Connections {
+            target: d
+            function onHoveredNodeChanged() {
+                if (d.hoveredNode !== "")
+                    tooltip.open();
+                else
+                    tooltip.close();
+            }
+        }
 
         contentItem: Column {
             spacing: 4
 
             Label {
-                font.bold: true
                 text: d.hoveredNode
+                font.bold: true
             }
+
             Label {
-                text: tooltip.hoveredFrame ? "Parent: " + tooltip.hoveredFrame.parentId : ""
                 visible: tooltip.hoveredFrame && tooltip.hoveredFrame.parentId !== ""
+                text: tooltip.hoveredFrame ? "Parent: " + tooltip.hoveredFrame.parentId : ""
             }
+
             Label {
                 property string authority: d.hoveredNode !== "" && root.buffer ? root.buffer.getFrameAuthority(d.hoveredNode) : ""
-
-                text: "Authority: " + authority
                 visible: authority !== ""
+                text: "Authority: " + authority
             }
+
             Label {
                 text: {
                     if (!tooltip.hoveredFrame)
@@ -626,63 +666,45 @@ Item {
                 }
             }
         }
-
-        // Show/hide immediately without fade animation
-        enter: Transition {
-        }
-        exit: Transition {
-        }
-
-        // Open/close explicitly so no ghost rectangle lingers
-        Connections {
-            function onHoveredNodeChanged() {
-                if (d.hoveredNode !== "")
-                    tooltip.open();
-                else
-                    tooltip.close();
-            }
-
-            target: d
-        }
     }
 
     // ========================================================================
     // Zoom Controls Overlay
     // ========================================================================
+
     Row {
         id: zoomRow
-        anchors.bottom: parent.bottom
         anchors.right: parent.right
+        anchors.bottom: parent.bottom
         spacing: 4
 
         IconButton {
             text: IconFont.iconMagnifyingGlassPlus
             tooltipText: "Zoom in"
-
             onClicked: {
                 d.scale = Math.min(3.0, d.scale * 1.2);
                 canvas.requestPaint();
             }
         }
+
         IconButton {
             text: IconFont.iconMagnifyingGlassMinus
             tooltipText: "Zoom out"
-
             onClicked: {
                 d.scale = Math.max(0.1, d.scale / 1.2);
                 canvas.requestPaint();
             }
         }
+
         IconButton {
             text: IconFont.iconExpand
             tooltipText: "Fit to view"
-
             onClicked: root.fitToView()
         }
+
         IconButton {
             text: root.horizontal ? IconFont.iconArrowsUpDown : IconFont.iconArrowsLeftRight
             tooltipText: root.horizontal ? "Switch to vertical layout" : "Switch to horizontal layout"
-
             onClicked: root.horizontal = !root.horizontal
         }
     }
@@ -690,15 +712,16 @@ Item {
     // ========================================================================
     // Legend
     // ========================================================================
+
     Rectangle {
-        anchors.bottom: parent.bottom
         anchors.left: parent.left
+        anchors.bottom: parent.bottom
+        width: legendColumn.width + 24
+        height: legendColumn.height + 24
+        color: Qt.rgba(palette.base.r, palette.base.g, palette.base.b, 0.9)
+        radius: 4
         border.color: palette.mid
         border.width: 1
-        color: Qt.rgba(palette.base.r, palette.base.g, palette.base.b, 0.9)
-        height: legendColumn.height + 24
-        radius: 4
-        width: legendColumn.width + 24
 
         Column {
             id: legendColumn
@@ -707,48 +730,20 @@ Item {
 
             Row {
                 spacing: 8
-
-                Rectangle {
-                    anchors.verticalCenter: parent.verticalCenter
-                    color: root.freshColor
-                    height: 16
-                    radius: 3
-                    width: 16
-                }
-                Label {
-                    anchors.verticalCenter: parent.verticalCenter
-                    text: "Dynamic"
-                }
+                Rectangle { width: 16; height: 16; radius: 3; color: root.freshColor; anchors.verticalCenter: parent.verticalCenter }
+                Label { text: "Dynamic"; anchors.verticalCenter: parent.verticalCenter }
             }
+
             Row {
                 spacing: 8
-
-                Rectangle {
-                    anchors.verticalCenter: parent.verticalCenter
-                    color: root.staticColor
-                    height: 16
-                    radius: 3
-                    width: 16
-                }
-                Label {
-                    anchors.verticalCenter: parent.verticalCenter
-                    text: "Static"
-                }
+                Rectangle { width: 16; height: 16; radius: 3; color: root.staticColor; anchors.verticalCenter: parent.verticalCenter }
+                Label { text: "Static"; anchors.verticalCenter: parent.verticalCenter }
             }
+
             Row {
                 spacing: 8
-
-                Rectangle {
-                    anchors.verticalCenter: parent.verticalCenter
-                    color: root.staleColor
-                    height: 16
-                    radius: 3
-                    width: 16
-                }
-                Label {
-                    anchors.verticalCenter: parent.verticalCenter
-                    text: "Stale (>" + root.staleThreshold + "s)"
-                }
+                Rectangle { width: 16; height: 16; radius: 3; color: root.staleColor; anchors.verticalCenter: parent.verticalCenter }
+                Label { text: "Stale (>" + root.staleThreshold + "s)"; anchors.verticalCenter: parent.verticalCenter }
             }
         }
     }
@@ -756,19 +751,19 @@ Item {
     // ========================================================================
     // Transform Panel
     // ========================================================================
+
     TfTransformDisplay {
         id: transformPanel
-        anchors.left: parent.left
-        anchors.margins: 8
-        anchors.top: parent.top
-        buffer: root.buffer
-        expanded: context.graphTransformOpen ?? true
         objectName: "tfTransformPanel"
-        sourceFrame: root.sourceFrame
-        targetFrame: root.targetFrame
+        anchors.left: parent.left
+        anchors.top: parent.top
+        anchors.margins: 8
         width: 400
         z: 2
-
+        buffer: root.buffer
+        sourceFrame: root.sourceFrame
+        targetFrame: root.targetFrame
+        expanded: context.graphTransformOpen ?? true
         onExpandedChanged: context.graphTransformOpen = expanded
         onSwapRequested: root.swapFrames()
     }

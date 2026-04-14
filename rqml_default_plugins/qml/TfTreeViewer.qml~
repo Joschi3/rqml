@@ -14,42 +14,8 @@ import "elements"
  */
 Rectangle {
     id: root
-
-    //! Semantic status colors shared with sub-components
-    readonly property color freshColor: Material.color(Material.Green)
-
-    // ========================================================================
-    // Constants
-    // ========================================================================
-
-    //! Indentation per tree depth level in pixels
-    readonly property int indentPerLevel: 16
-    property var kddockwidgets_min_size: Qt.size(400, 300)
-
-    //! Currently selected source frame (empty = none)
-    property string sourceFrame: ""
-    readonly property color staleColor: Material.color(Material.Red)
-
-    //! Age threshold (in seconds) after which a dynamic transform is considered stale
-    readonly property real staleThreshold: 5.0
-    readonly property color staticColor: Material.color(Material.Blue)
-
-    //! Currently selected target frame (empty = none)
-    property string targetFrame: ""
-
-    function selectFrame(nodeId, modifiers) {
-        if ((modifiers & Qt.ControlModifier) && root.targetFrame !== "") {
-            // Ctrl+click: keep current source, set clicked frame as target
-            root.targetFrame = nodeId;
-        } else {
-            // Normal click: source = clicked frame, target = parent
-            const frame = d.tfInterface.getFrame(nodeId);
-            root.sourceFrame = nodeId;
-            root.targetFrame = frame ? frame.parentId : "";
-        }
-    }
-
     anchors.fill: parent
+    property var kddockwidgets_min_size: Qt.size(400, 300)
     color: palette.base
 
     Component.onCompleted: {
@@ -61,20 +27,37 @@ Rectangle {
     }
 
     // ========================================================================
+    // Constants
+    // ========================================================================
+
+    //! Indentation per tree depth level in pixels
+    readonly property int indentPerLevel: 16
+
+    //! Age threshold (in seconds) after which a dynamic transform is considered stale
+    readonly property real staleThreshold: 5.0
+
+    //! Semantic status colors shared with sub-components
+    readonly property color freshColor: Material.color(Material.Green)
+    readonly property color staticColor: Material.color(Material.Blue)
+    readonly property color staleColor: Material.color(Material.Red)
+
+    // ========================================================================
     // Private Data
     // ========================================================================
+
     QtObject {
         id: d
 
+        property string viewMode: context.viewMode ?? "graph" // Default to graph view
         property var namespaces: []
-        property var tfBuffer: TfBuffer {
-            ns: context.namespace || ""
-        }
         property var tfInterface: TfTreeInterface {
             buffer: d.tfBuffer
             enabled: context.enabled ?? true
         }
-        property string viewMode: context.viewMode ?? "graph" // Default to graph view
+
+        property var tfBuffer: TfBuffer {
+            ns: context.namespace || ""
+        }
 
         function clear() {
             root.sourceFrame = "";
@@ -82,11 +65,10 @@ Rectangle {
             d.tfInterface.clear();
         }
 
-        /**
-         * Convert display namespace back to actual namespace.
-         */
-        function displayToNamespace(display) {
-            return display === "(global)" ? "" : display;
+        function swapFrames() {
+            const tmp = root.sourceFrame;
+            root.sourceFrame = root.targetFrame;
+            root.targetFrame = tmp;
         }
 
         /**
@@ -98,6 +80,7 @@ Rectangle {
             // Query all tf topics
             const tfTopics = Ros2.queryTopics("tf2_msgs/msg/TFMessage");
             let namespaceSet = {};
+
             for (let i = 0; i < tfTopics.length; ++i) {
                 const topic = tfTopics[i];
                 // Extract namespace from topic path
@@ -127,6 +110,7 @@ Rectangle {
             for (let i = 0; i < nsList.length; ++i) {
                 displayList.push(nsList[i] === "" ? "(global)" : nsList[i]);
             }
+
             d.namespaces = displayList;
 
             // Restore previous selection
@@ -138,16 +122,37 @@ Rectangle {
                 }
             }
         }
-        function swapFrames() {
-            const tmp = root.sourceFrame;
-            root.sourceFrame = root.targetFrame;
-            root.targetFrame = tmp;
+
+        /**
+         * Convert display namespace back to actual namespace.
+         */
+        function displayToNamespace(display) {
+            return display === "(global)" ? "" : display;
+        }
+    }
+
+    //! Currently selected source frame (empty = none)
+    property string sourceFrame: ""
+
+    //! Currently selected target frame (empty = none)
+    property string targetFrame: ""
+
+    function selectFrame(nodeId, modifiers) {
+        if ((modifiers & Qt.ControlModifier) && root.targetFrame !== "") {
+            // Ctrl+click: keep current source, set clicked frame as target
+            root.targetFrame = nodeId;
+        } else {
+            // Normal click: source = clicked frame, target = parent
+            const frame = d.tfInterface.getFrame(nodeId);
+            root.sourceFrame = nodeId;
+            root.targetFrame = frame ? frame.parentId : "";
         }
     }
 
     // ========================================================================
     // UI Layout
     // ========================================================================
+
     ColumnLayout {
         anchors.fill: parent
         anchors.margins: 8
@@ -156,6 +161,7 @@ Rectangle {
         // --------------------------------------------------------------------
         // Header Row: Namespace Selection
         // --------------------------------------------------------------------
+
         RowLayout {
             Layout.fillWidth: true
             spacing: 8
@@ -163,11 +169,12 @@ Rectangle {
             Label {
                 text: "Namespace:"
             }
+
             ComboBox {
                 id: namespaceComboBox
+                objectName: "tfNamespaceComboBox"
                 Layout.fillWidth: true
                 model: d.namespaces
-                objectName: "tfNamespaceComboBox"
 
                 onCurrentTextChanged: {
                     if (!currentText)
@@ -178,9 +185,9 @@ Rectangle {
                     context.namespace = ns;
                 }
             }
+
             RefreshButton {
                 objectName: "tfRefreshButton"
-
                 onClicked: {
                     animate = true;
                     d.refresh();
@@ -192,61 +199,61 @@ Rectangle {
         // --------------------------------------------------------------------
         // Toolbar Row: Controls
         // --------------------------------------------------------------------
+
         RowLayout {
             Layout.fillWidth: true
             spacing: 8
 
             Label {
-                font.bold: true
                 objectName: "tfFrameCountLabel"
-                text: "Frames: " + d.tfInterface.frameCount + "  —  Root frames: " + d.tfInterface.rootFrames.length
+                text: "Frames: " + d.tfInterface.frameCount +
+                      "  —  Root frames: " + d.tfInterface.rootFrames.length
+                font.bold: true
             }
-            Item {
-                Layout.fillWidth: true
-            }
+
+            Item { Layout.fillWidth: true }
 
             // View mode toggle
             ButtonGroup {
                 id: viewModeGroup
             }
+
             Button {
-                ButtonGroup.group: viewModeGroup
-                checkable: true
-                checked: d.viewMode === "graph"
                 objectName: "tfGraphModeButton"
                 text: "Graph"
-
+                checkable: true
+                checked: d.viewMode === "graph"
+                ButtonGroup.group: viewModeGroup
                 onClicked: context.viewMode = "graph"
             }
+
             Button {
-                ButtonGroup.group: viewModeGroup
-                checkable: true
-                checked: d.viewMode === "list"
                 objectName: "tfListModeButton"
                 text: "List"
-
+                checkable: true
+                checked: d.viewMode === "list"
+                ButtonGroup.group: viewModeGroup
                 onClicked: context.viewMode = "list"
             }
-            Item {
-                width: 8
-            }
-            IconToggleButton {
-                checked: context.enabled ?? true
-                iconOff: IconFont.iconPlay
-                iconOn: IconFont.iconPause
-                objectName: "tfEnableToggle"
-                tooltipTextOff: "Click to resume"
-                tooltipTextOn: "Click to pause"
 
+            Item { width: 8 }
+
+            IconToggleButton {
+                objectName: "tfEnableToggle"
+                iconOn: IconFont.iconPause
+                iconOff: IconFont.iconPlay
+                tooltipTextOn: "Click to pause"
+                tooltipTextOff: "Click to resume"
+                checked: context.enabled ?? true
                 onToggled: {
                     context.enabled = checked;
                 }
             }
+
             IconButton {
                 objectName: "tfClearButton"
                 text: IconFont.iconTrash
                 tooltipText: "Clear all data"
-
                 onClicked: d.clear()
             }
         }
@@ -254,42 +261,41 @@ Rectangle {
         // --------------------------------------------------------------------
         // Main Content: Graph or List View
         // --------------------------------------------------------------------
+
         StackLayout {
-            Layout.fillHeight: true
-            Layout.fillWidth: true
-            currentIndex: d.viewMode === "graph" ? 0 : 1
             objectName: "tfViewStack"
+            Layout.fillWidth: true
+            Layout.fillHeight: true
+            currentIndex: d.viewMode === "graph" ? 0 : 1
 
             // Graph View
             TfGraphView {
                 id: graphView
-                buffer: d.tfBuffer
-                freshColor: root.freshColor
                 objectName: "tfGraphView"
-                sourceFrame: root.sourceFrame
-                staleColor: root.staleColor
-                staleThreshold: root.staleThreshold
-                staticColor: root.staticColor
-                targetFrame: root.targetFrame
                 tfInterface: d.tfInterface
-
+                buffer: d.tfBuffer
+                sourceFrame: root.sourceFrame
+                targetFrame: root.targetFrame
+                staleThreshold: root.staleThreshold
                 onSelectFrame: (frameId, modifiers) => root.selectFrame(frameId, modifiers)
                 onSwapFrames: d.swapFrames()
+                freshColor: root.freshColor
+                staticColor: root.staticColor
+                staleColor: root.staleColor
             }
 
             // List View
             TfListView {
                 id: listView
-                buffer: d.tfBuffer
-                freshColor: root.freshColor
-                indentPerLevel: root.indentPerLevel
-                sourceFrame: root.sourceFrame
-                staleColor: root.staleColor
-                staleThreshold: root.staleThreshold
-                staticColor: root.staticColor
-                targetFrame: root.targetFrame
                 tfInterface: d.tfInterface
-
+                buffer: d.tfBuffer
+                sourceFrame: root.sourceFrame
+                targetFrame: root.targetFrame
+                staleThreshold: root.staleThreshold
+                indentPerLevel: root.indentPerLevel
+                freshColor: root.freshColor
+                staticColor: root.staticColor
+                staleColor: root.staleColor
                 onSelectFrame: (frameId, modifiers) => root.selectFrame(frameId, modifiers)
                 onSwapFrames: d.swapFrames()
             }
@@ -298,6 +304,7 @@ Rectangle {
         // --------------------------------------------------------------------
         // Status Bar
         // --------------------------------------------------------------------
+
         RowLayout {
             Layout.fillWidth: true
             spacing: 8

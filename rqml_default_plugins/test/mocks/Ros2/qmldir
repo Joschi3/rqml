@@ -1,2 +1,4 @@
 module Ros2
 ImageTransportSubscription 1.0 ImageTransportSubscription.qml
+TfBuffer 1.0 TfBuffer.qml
+TfTransform 1.0 TfTransform.qml
