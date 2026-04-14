@@ -22,6 +22,9 @@ Item {
     //! Indentation per tree depth level in pixels
     property int indentPerLevel: 16
 
+    //! Search text for filtering frames (lowercase, empty = no filter)
+    property string searchText: ""
+
     //! Currently selected source frame (empty = none)
     property string sourceFrame: ""
     property color staleColor: Material.color(Material.Red)
@@ -41,6 +44,28 @@ Item {
 
     //! Signal emitted when the user requests swapping source and target
     signal swapFrames
+
+    /**
+     * Jump to the next (or previous) matching frame in the list.
+     */
+    function jumpToNextMatch(forward) {
+        if (root.searchText === "" || !root.tfInterface)
+            return;
+        const count = root.tfInterface.frames.count;
+        if (count === 0)
+            return;
+        const start = frameListView.currentIndex >= 0 ? frameListView.currentIndex : (forward ? -1 : count);
+        for (let step = 1; step <= count; ++step) {
+            const idx = forward ? (start + step) % count : (start - step + count) % count;
+            const item = root.tfInterface.frames.get(idx);
+            if (item.frameId.toLowerCase().indexOf(root.searchText) !== -1) {
+                frameListView.currentIndex = idx;
+                // positionViewAtIndex must run after the ListView processes the currentIndex change
+                Qt.callLater(frameListView.positionViewAtIndex, idx, ListView.Center);
+                return;
+            }
+        }
+    }
 
     QtObject {
         id: d
@@ -79,10 +104,12 @@ Item {
                 id: delegateRoot
 
                 required property int index
+                readonly property bool matchesSearch: root.searchText === "" || model.frameId.toLowerCase().indexOf(root.searchText) !== -1
                 required property var model
 
                 color: index % 2 === 0 ? palette.base : palette.alternateBase
                 height: 36
+                opacity: matchesSearch ? 1.0 : 0.3
                 width: frameListView.width
 
                 MouseArea {

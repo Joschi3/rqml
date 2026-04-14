@@ -30,6 +30,9 @@ Item {
     property int nodeSpacing: 4
     property int nodeWidth: 160
 
+    //! Search text for filtering nodes (lowercase, empty = no filter)
+    property string searchText: ""
+
     //! Currently selected source frame (empty = none)
     property string sourceFrame: ""
     property color sourceFrameColor: Material.color(Material.Red, Material.Shade400)
@@ -115,6 +118,38 @@ Item {
         canvas.requestPaint();
     }
 
+    /**
+     * Jump to the next (or previous) node matching the search text, centering it in the view.
+     */
+    function jumpToNextMatch(forward) {
+        if (root.searchText === "" || d.nodePositions.length === 0)
+            return;
+        const matches = [];
+        for (let i = 0; i < d.nodePositions.length; ++i) {
+            if (d.nodePositions[i].frameId.toLowerCase().indexOf(root.searchText) !== -1)
+                matches.push(i);
+        }
+        if (matches.length === 0)
+            return;
+        // Find next/prev match relative to current
+        let nextIdx = forward ? 0 : matches.length - 1;
+        if (d.currentSearchIndex >= 0) {
+            const curPos = matches.indexOf(d.currentSearchIndex);
+            if (forward)
+                nextIdx = curPos >= 0 ? (curPos + 1) % matches.length : 0;
+            else
+                nextIdx = curPos >= 0 ? (curPos - 1 + matches.length) % matches.length : matches.length - 1;
+        }
+        d.currentSearchIndex = matches[nextIdx];
+        // Center the view on the matched node
+        const node = d.nodePositions[d.currentSearchIndex];
+        const cx = node.x + nodeWidth / 2;
+        const cy = node.y + nodeHeight / 2;
+        d.offsetX = root.width / 2 - cx * d.scale;
+        d.offsetY = root.height / 2 - cy * d.scale;
+        canvas.requestPaint();
+    }
+
     Component.onCompleted: {
         if (tfInterface) {
             d.calculateLayout();
@@ -132,6 +167,10 @@ Item {
     // ========================================================================
     // Signals
     // ========================================================================
+    onSearchTextChanged: {
+        d.currentSearchIndex = -1;
+        canvas.requestPaint();
+    }
     onSourceFrameChanged: canvas.requestPaint()
     onTargetFrameChanged: canvas.requestPaint()
     onTfInterfaceChanged: {
@@ -150,6 +189,7 @@ Item {
 
         //! Frame stashed when the right-click menu opens; independent of source/target
         property string contextMenuFrame: ""
+        property int currentSearchIndex: -1
         property var edges: []          // Array of {from, to, fromX, fromY, toX, toY}
         property string hoveredNode: ""
         property var nodePositions: []  // Array of {frameId, x, y, level, isStatic, age}
@@ -366,13 +406,25 @@ Item {
             ctx.translate(d.offsetX, d.offsetY);
             ctx.scale(d.scale, d.scale);
 
+            // Pre-compute search match set for dimming
+            const searching = root.searchText !== "";
+            let matchSet = {};
+            if (searching) {
+                for (let i = 0; i < d.nodePositions.length; ++i) {
+                    if (d.nodePositions[i].frameId.toLowerCase().indexOf(root.searchText) !== -1)
+                        matchSet[d.nodePositions[i].frameId] = true;
+                }
+            }
+
             // Draw edges with arrows
-            ctx.strokeStyle = edgeColor;
             ctx.lineWidth = 2 / d.scale;
             const arrowSize = 7;
             const arrowWidth = arrowSize * 0.5;
             for (let i = 0; i < d.edges.length; ++i) {
                 const edge = d.edges[i];
+                const edgeDimmed = searching && !matchSet[edge.from] && !matchSet[edge.to];
+                ctx.globalAlpha = edgeDimmed ? 0.15 : 1.0;
+                ctx.strokeStyle = edgeColor;
                 if (root.horizontal) {
                     // Horizontal: arrow pointing right
                     const arrowBaseX = edge.toX - arrowSize;
@@ -412,6 +464,8 @@ Item {
                 const isHovered = node.frameId === d.hoveredNode;
                 const isSource = node.frameId === root.sourceFrame;
                 const isTarget = node.frameId === root.targetFrame;
+                const nodeDimmed = searching && !matchSet[node.frameId];
+                ctx.globalAlpha = nodeDimmed ? 0.15 : 1.0;
 
                 // Node background - manual rounded rectangle (roundRect not available in QML Canvas)
                 const r = 4;  // corner radius
@@ -771,5 +825,82 @@ Item {
 
         onExpandedChanged: context.graphTransformOpen = expanded
         onSwapRequested: root.swapFrames()
+    }
+
+    // ========================================================================
+    // Search (top-right): icon button that expands into a search bar
+    // ========================================================================
+
+    // Dismiss overlay: catches clicks outside the search bar to collapse it
+    MouseArea {
+        anchors.fill: parent
+        enabled: searchContainer.searchExpanded && graphSearchBar.text === ""
+        visible: enabled
+        z: searchContainer.z - 1
+
+        onPressed: mouse => {
+            searchContainer.searchExpanded = false;
+            // Re-deliver the press to the canvas mouse area underneath
+            mouse.accepted = false;
+        }
+    }
+    Rectangle {
+        id: searchContainer
+
+        property bool searchExpanded: false
+
+        anchors.margins: 8
+        anchors.right: parent.right
+        anchors.top: parent.top
+        border.color: palette.mid
+        border.width: searchExpanded ? 1 : 0
+        color: Qt.rgba(palette.base.r, palette.base.g, palette.base.b, 0.9)
+        height: searchExpanded ? graphSearchBar.implicitHeight + 12 : searchToggle.height
+        radius: 4
+        width: searchExpanded ? 320 : searchToggle.width
+        z: 2
+
+        Behavior on height  {
+            NumberAnimation {
+                duration: 150
+                easing.type: Easing.InOutQuad
+            }
+        }
+        Behavior on width  {
+            NumberAnimation {
+                duration: 150
+                easing.type: Easing.InOutQuad
+            }
+        }
+
+        IconButton {
+            id: searchToggle
+            bottomInset: 0
+            leftInset: 0
+            objectName: "tfGraphSearchToggle"
+            rightInset: 0
+            text: IconFont.iconSearch
+            tooltipText: "Search frames"
+            topInset: 0
+            visible: !searchContainer.searchExpanded
+
+            onClicked: {
+                searchContainer.searchExpanded = true;
+                graphSearchBar.focusSearch();
+            }
+        }
+        SearchBar {
+            id: graphSearchBar
+            anchors.fill: parent
+            anchors.margins: 6
+            objectName: "tfGraphSearchBar"
+            placeholderText: "Search frames..."
+            showNavigation: true
+            visible: searchContainer.searchExpanded
+
+            onNextRequested: root.jumpToNextMatch(true)
+            onPreviousRequested: root.jumpToNextMatch(false)
+            onTextChanged: root.searchText = text
+        }
     }
 }

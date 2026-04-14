@@ -26,6 +26,9 @@ Rectangle {
     readonly property int indentPerLevel: 16
     property var kddockwidgets_min_size: Qt.size(400, 300)
 
+    //! Current search/filter text (shared with sub-views)
+    property string searchText: ""
+
     //! Currently selected source frame (empty = none)
     property string sourceFrame: ""
     readonly property color staleColor: Material.color(Material.Red)
@@ -252,6 +255,21 @@ Rectangle {
         }
 
         // --------------------------------------------------------------------
+        // Search Bar
+        // --------------------------------------------------------------------
+        SearchBar {
+            id: searchBar
+            Layout.fillWidth: true
+            objectName: "tfSearchBar"
+            placeholderText: "Search frames..."
+            visible: d.viewMode === "list"
+
+            onNextRequested: listView.jumpToNextMatch(true)
+            onPreviousRequested: listView.jumpToNextMatch(false)
+            onTextChanged: root.searchText = searchBar.text
+        }
+
+        // --------------------------------------------------------------------
         // Main Content: Graph or List View
         // --------------------------------------------------------------------
         StackLayout {
@@ -283,6 +301,7 @@ Rectangle {
                 buffer: d.tfBuffer
                 freshColor: root.freshColor
                 indentPerLevel: root.indentPerLevel
+                searchText: root.searchText
                 sourceFrame: root.sourceFrame
                 staleColor: root.staleColor
                 staleThreshold: root.staleThreshold

@@ -391,6 +391,20 @@ Item {
                     return false;
                 }, 3000, "Tooltip should show authority information");
         }
+        function test_graph_search_overlay_clamps_width_in_narrow_layout() {
+            var gv = useGraphMode();
+            seedGraphTree();
+            root.width = 400;
+            wait(50);
+            var toggle = find("tfGraphSearchToggle");
+            verify(toggle !== null, "Graph search toggle should exist");
+            mouseClick(toggle);
+            var searchBar = find("tfGraphSearchBar");
+            verify(searchBar !== null, "Expanded graph search bar should exist");
+            tryVerify(function () {
+                    return searchBar.visible && searchBar.width > 0;
+                }, 1000, "Graph search bar should remain usable in a narrow dock");
+        }
         function test_list_click_sets_parent_and_target() {
             var listView = find("tfFrameListView");
             var transformDisplay = find("tfListTransformDisplay");
