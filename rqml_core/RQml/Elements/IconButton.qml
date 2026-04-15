@@ -2,11 +2,10 @@ import QtQuick.Controls
 import RQml.Fonts
 
 RoundButton {
-    implicitWidth: 48
-    implicitHeight: 48
+    implicitWidth: implicitHeight
     property string tooltipText
     font.family: IconFont.name
-    font.pixelSize: 20
+    font.pixelSize: 18
     radius: 4
 
     ToolTip.visible: !!tooltipText && hovered

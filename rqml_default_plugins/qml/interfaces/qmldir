@@ -1,3 +1,4 @@
 ControllerManagerInterface 1.0 ControllerManagerInterface.qml
 JointTrajectoryControllerInterface 1.0 JointTrajectoryControllerInterface.qml
 singleton ParameterService 1.0 ParameterService.qml
+TfTreeInterface 1.0 TfTreeInterface.qml
