@@ -14,6 +14,11 @@ plugins:
     group: "Control"
     path: "share/@PROJECT_NAME@/qml/ControllerManager.qml"
     single_instance: false
+  - id: default_plugins.controller_manager_statistics
+    name: "Controller Manager Statistics"
+    group: "Introspection"
+    path: "share/@PROJECT_NAME@/qml/ControllerManagerStatistics.qml"
+    single_instance: false
   - id: default_plugins.image_view
     name: "Image View"
     group: "Video"
@@ -43,11 +48,6 @@ plugins:
     name: "Robot Steering"
     group: "Control"
     path: "share/@PROJECT_NAME@/qml/RobotSteering.qml"
-    single_instance: false
-  - id: default_plugins.runtime_statistics
-    name: "Runtime Statistics"
-    group: "Control"
-    path: "share/@PROJECT_NAME@/qml/RuntimeStatistics.qml"
     single_instance: false
   - id: default_plugins.service_caller
     name: "Service Caller"
