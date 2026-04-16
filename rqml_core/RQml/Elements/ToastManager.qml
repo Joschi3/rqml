@@ -14,7 +14,6 @@
  *  You should have received a copy of the GNU General Public License
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Controls.Material
@@ -23,34 +22,14 @@ import RQml.Fonts
 
 Item {
     id: root
-    anchors.right: parent.right
-    anchors.bottom: parent.bottom
-    anchors.margins: 12
-    width: Math.min(parent ? parent.width * 0.8 : 400, 420)
-    height: toastListView.contentHeight
 
-    property int maxToasts: 5
-    property int dismissDuration: 5000
     readonly property int count: toastModel.count
-
-    function show(message, level) {
-        if (toastModel.count >= root.maxToasts) {
-            toastModel.remove(0);
-        }
-        let toastId = createToastId();
-        while (getToastById(toastId) !== null)
-            toastId = createToastId();
-        toastModel.append({
-            toastId: toastId,
-            message: message,
-            level: level || "info"
-        });
-    }
+    property int dismissDuration: 5000
+    property int maxToasts: 5
 
     function createToastId() {
         return Math.random().toString(36).substring(7);
     }
-
     function getToastById(id) {
         for (let i = 0; i < toastModel.count; i++) {
             if (toastModel.get(i).toastId === id) {
@@ -59,16 +38,6 @@ Item {
         }
         return null;
     }
-
-    function removeToastById(id) {
-        for (let i = 0; i < toastModel.count; i++) {
-            if (toastModel.get(i).toastId === id) {
-                toastModel.remove(i);
-                break;
-            }
-        }
-    }
-
     function getToastColor(level) {
         switch (level) {
         case "error":
@@ -79,7 +48,6 @@ Item {
             return Material.color(Material.BlueGrey, Material.Shade800);
         }
     }
-
     function getToastIcon(level) {
         switch (level) {
         case "error":
@@ -90,72 +58,74 @@ Item {
             return IconFont.iconInfo;
         }
     }
+    function removeToastById(id) {
+        for (let i = 0; i < toastModel.count; i++) {
+            if (toastModel.get(i).toastId === id) {
+                toastModel.remove(i);
+                break;
+            }
+        }
+    }
+    function show(message, level) {
+        if (toastModel.count >= root.maxToasts) {
+            toastModel.remove(0);
+        }
+        let toastId = createToastId();
+        while (getToastById(toastId) !== null)
+            toastId = createToastId();
+        toastModel.append({
+                "toastId": toastId,
+                "message": message,
+                "level": level || "info"
+            });
+    }
+
+    anchors.bottom: parent.bottom
+    anchors.margins: 12
+    anchors.right: parent.right
+    height: toastListView.contentHeight
+    width: Math.min(parent ? parent.width * 0.8 : 400, 420)
 
     ListModel {
         id: toastModel
     }
-
     ListView {
         id: toastListView
         anchors.fill: parent
+        interactive: false
         model: toastModel
         spacing: 12
-        interactive: false
 
         add: Transition {
             NumberAnimation {
-                property: "opacity"
+                duration: 250
                 from: 0
-                to: 1
-                duration: 250
-            }
-            NumberAnimation {
-                property: "scale"
-                from: 0.9
-                to: 1
-                duration: 250
-            }
-        }
-
-        move: Transition {
-            NumberAnimation {
-                properties: "y"
-                duration: 250
-                easing.type: Easing.OutCubic
-            }
-        }
-
-        remove: Transition {
-            NumberAnimation {
                 property: "opacity"
-                to: 0
-                duration: 200
+                to: 1
             }
             NumberAnimation {
+                duration: 250
+                from: 0.9
                 property: "scale"
-                to: 0.9
-                duration: 200
+                to: 1
             }
         }
-
         delegate: Rectangle {
             id: toastItemDelegate
 
-            required property string toastId
-            required property string message
             required property string level
+            required property string message
+            required property string toastId
 
-            width: toastListView.width
+            clip: true
+            color: root.getToastColor(toastItemDelegate.level)
             height: toastLayout.implicitHeight + progressBar.height + 24
             radius: 8
-            clip: true
-
-            color: root.getToastColor(toastItemDelegate.level)
+            width: toastListView.width
 
             HoverHandler {
                 id: toastHover
             }
-
             RowLayout {
                 id: toastLayout
                 anchors.fill: parent
@@ -164,55 +134,73 @@ Item {
 
                 Text {
                     Layout.alignment: Qt.AlignVCenter
+                    color: "white"
                     font.family: IconFont.name
                     font.pixelSize: 20
-                    color: "white"
                     text: root.getToastIcon(toastItemDelegate.level)
                 }
-
                 Label {
-                    Layout.fillWidth: true
                     Layout.fillHeight: true
+                    Layout.fillWidth: true
                     color: "white"
-                    wrapMode: Text.Wrap
                     font.pixelSize: 13
                     font.weight: Font.Medium
-                    verticalAlignment: Text.AlignVCenter
                     text: toastItemDelegate.message
+                    verticalAlignment: Text.AlignVCenter
+                    wrapMode: Text.Wrap
                 }
-
                 IconButton {
                     id: closeButton
                     Layout.alignment: Qt.AlignVCenter
                     flat: true
                     radius: width / 2
                     text: "\u2715"
+
                     onClicked: root.removeToastById(toastItemDelegate.toastId)
                 }
             }
-
             Rectangle {
                 id: progressBar
+                anchors.bottom: parent.bottom
                 anchors.left: parent.left
                 anchors.leftMargin: parent.radius
-                anchors.bottom: parent.bottom
-                height: 4
                 color: Qt.rgba(1, 1, 1, 0.3)
+                height: 4
                 width: parent.width
 
-                NumberAnimation on width {
+                NumberAnimation on width  {
                     id: progressAnim
-                    from: toastItemDelegate.width
-                    to: 0
                     duration: root.dismissDuration
-                    running: true
+                    from: toastItemDelegate.width
                     paused: toastHover.hovered
+                    running: true
+                    to: 0
+
                     onStopped: {
                         if (progressBar.width === 0) {
                             root.removeToastById(toastItemDelegate.toastId);
                         }
                     }
                 }
+            }
+        }
+        move: Transition {
+            NumberAnimation {
+                duration: 250
+                easing.type: Easing.OutCubic
+                properties: "y"
+            }
+        }
+        remove: Transition {
+            NumberAnimation {
+                duration: 200
+                property: "opacity"
+                to: 0
+            }
+            NumberAnimation {
+                duration: 200
+                property: "scale"
+                to: 0.9
             }
         }
     }

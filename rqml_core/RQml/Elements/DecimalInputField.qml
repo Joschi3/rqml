@@ -14,28 +14,25 @@
  *  You should have received a copy of the GNU General Public License
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-
 import QtQuick
 import QtQuick.Controls
 
 TextField {
-    selectByMouse: true
+    property int decimals: 3
     property var from: null
     property var to: null
     property real value: 0.0
-    property int decimals: 3
 
     function formatValue(v) {
         // Small trick to get fixed number of decimals without trailing zeros
         return Number(Number(v).toFixed(decimals));
     }
 
+    selectByMouse: true
     text: formatValue(value)
 
-    onValueChanged: {
-        let formatted = formatValue(value);
-        if (text !== formatted)
-            text = formatted;
+    validator: RegularExpressionValidator {
+        regularExpression: /^-?[0-9]*$|^-?([0-9]+\.[0-9]*)$/
     }
 
     onEditingFinished: {
@@ -52,7 +49,6 @@ TextField {
             newValue = from;
         if (to !== null && to !== undefined && newValue > to)
             newValue = to;
-
         if (newValue === value) {
             let formatted = formatValue(value);
             if (text !== formatted)
@@ -61,8 +57,9 @@ TextField {
         }
         value = newValue;
     }
-
-    validator: RegularExpressionValidator {
-        regularExpression: /^-?[0-9]*$|^-?([0-9]+\.[0-9]*)$/
+    onValueChanged: {
+        let formatted = formatValue(value);
+        if (text !== formatted)
+            text = formatted;
     }
 }

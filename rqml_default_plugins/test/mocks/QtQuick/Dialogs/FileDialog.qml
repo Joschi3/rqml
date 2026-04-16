@@ -7,30 +7,28 @@ import QtQuick.Controls
  */
 QtObject {
     id: root
+    enum FileModes {
+        OpenFile,
+        OpenFiles,
+        SaveFile,
+        Folder
+    }
 
-    // FileDialog properties
-    property string title: ""
+    property string defaultSuffix: ""
+    property int fileMode: FileDialog.OpenFile
     property url fileUrl: ""
     property var fileUrls: []
     property url folder: ""
-    property string selectedFile: "" // Convenience for tests
-    property bool visible: false
     property bool modal: true
     property var nameFilters: []
-    enum FileModes { OpenFile, OpenFiles, SaveFile, Folder }
-    property int fileMode: FileDialog.OpenFile
-    property string defaultSuffix: ""
+    property string selectedFile: "" // Convenience for tests
 
-    signal accepted()
-    signal rejected()
+    // FileDialog properties
+    property string title: ""
+    property bool visible: false
 
-    function open() {
-        visible = true;
-    }
-
-    function close() {
-        visible = false;
-    }
+    signal accepted
+    signal rejected
 
     // Test helper to simulate user accepting the dialog
     function accept(url) {
@@ -40,6 +38,12 @@ QtObject {
         }
         accepted();
         close();
+    }
+    function close() {
+        visible = false;
+    }
+    function open() {
+        visible = true;
     }
 
     // Test helper to simulate user cancelling the dialog

@@ -14,7 +14,6 @@
  *  You should have received a copy of the GNU General Public License
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
@@ -30,25 +29,14 @@ import "ParameterModelLogic.js" as ModelLogic
 
 Rectangle {
     id: parameterEditor
-    anchors.fill: parent
-    property var kddockwidgets_min_size: Qt.size(350, 500)
-    color: palette.base
 
-    property alias saveDialog: saveFileDialog
-    property alias loadDialog: loadFileDialog
     property alias d: internalState
+    property var kddockwidgets_min_size: Qt.size(350, 500)
+    property alias loadDialog: loadFileDialog
+    property alias saveDialog: saveFileDialog
 
-    ToastManager {
-        id: toastManager
-        z: 100
-    }
-
-    ArrayEditDialog {
-        id: arrayEditDialog
-        onParameterSetFailed: function(paramName, reason) {
-            toastManager.show(qsTr("Failed to set %1: %2").arg(paramName).arg(reason), "error");
-        }
-    }
+    anchors.fill: parent
+    color: palette.base
 
     Component.onCompleted: {
         if (context.quickAccess === undefined)
@@ -57,7 +45,6 @@ Rectangle {
             context.showStarredOnly = false;
         ParameterService.discoverNodes();
     }
-
     Component.onDestruction: {
         for (let i = 0; i < internalState.acquiredNodes.length; i++) {
             ParameterService.release(internalState.acquiredNodes[i]);
@@ -65,8 +52,20 @@ Rectangle {
         internalState.acquiredNodes = [];
     }
 
+    ToastManager {
+        id: toastManager
+        z: 100
+    }
+    ArrayEditDialog {
+        id: arrayEditDialog
+        onParameterSetFailed: function (paramName, reason) {
+            toastManager.show(qsTr("Failed to set %1: %2").arg(paramName).arg(reason), "error");
+        }
+    }
     Connections {
-        target: ParameterService
+        function onNodesChanged() {
+            internalState.rebuildModel();
+        }
         function onParametersChanged(nodeName) {
             let nodeData = ParameterService.getNodeData(nodeName);
             if (!nodeData) {
@@ -94,16 +93,17 @@ Rectangle {
             let prev = internalState.knownNodeStates[nodeName];
             if (!prev || prev.loaded !== nodeData.loaded || prev.loading !== nodeData.loading) {
                 let st = internalState.knownNodeStates;
-                st[nodeName] = { loaded: nodeData.loaded, loading: nodeData.loading };
+                st[nodeName] = {
+                    "loaded": nodeData.loaded,
+                    "loading": nodeData.loading
+                };
                 internalState.knownNodeStates = st;
                 internalState.rebuildModel();
             }
         }
-        function onNodesChanged() {
-            internalState.rebuildModel();
-        }
-    }
 
+        target: ParameterService
+    }
     ColumnLayout {
         anchors.fill: parent
         anchors.margins: 12
@@ -115,35 +115,36 @@ Rectangle {
 
             TextField {
                 id: filterTextField
-                objectName: "filterTextField"
                 Layout.fillWidth: true
+                objectName: "filterTextField"
+                padding: 8
                 placeholderText: qsTr("Filter parameters...")
                 selectByMouse: true
-                padding: 8
+
                 onTextChanged: searchDebounceTimer.start()
             }
-
             RefreshButton {
-                ToolTip.text: qsTr("Discover Nodes")
-                ToolTip.visible: hovered
                 Layout.preferredHeight: filterTextField.height
                 Layout.preferredWidth: filterTextField.height
+                ToolTip.text: qsTr("Discover Nodes")
+                ToolTip.visible: hovered
+
                 onClicked: {
                     animate = true;
                     ParameterService.discoverNodes();
                     animate = false;
                 }
             }
-
             IconToggleButton {
-                objectName: "starToggleButton"
-                iconOn: IconFont.iconStar
-                iconOff: IconFont.iconStar
-                tooltipTextOn: qsTr("Show only starred parameters")
-                tooltipTextOff: qsTr("Show all parameters")
-                checked: context.showStarredOnly ?? false
                 Layout.preferredHeight: filterTextField.height
                 Layout.preferredWidth: filterTextField.height
+                checked: context.showStarredOnly ?? false
+                iconOff: IconFont.iconStar
+                iconOn: IconFont.iconStar
+                objectName: "starToggleButton"
+                tooltipTextOff: qsTr("Show all parameters")
+                tooltipTextOn: qsTr("Show only starred parameters")
+
                 onToggled: {
                     if (checked === context.showStarredOnly)
                         return;
@@ -154,10 +155,7 @@ Rectangle {
         }
         FileDialog {
             id: saveFileDialog
-            objectName: "saveFileDialog"
-            title: qsTr("Save Parameters")
-            fileMode: FileDialog.SaveFile
-            nameFilters: ["JSON/YAML Files (*.json *.yaml *.yml)", "All Files (*)"]
+
             property string activeNode: ""
             property string activePath: ""
 
@@ -172,6 +170,11 @@ Rectangle {
                 return path;
             }
 
+            fileMode: FileDialog.SaveFile
+            nameFilters: ["JSON/YAML Files (*.json *.yaml *.yml)", "All Files (*)"]
+            objectName: "saveFileDialog"
+            title: qsTr("Save Parameters")
+
             onAccepted: {
                 let path = saveFileDialog.selectedFile.toString();
                 if (path.startsWith("file://"))
@@ -180,15 +183,17 @@ Rectangle {
                 internalState.saveGroupParams(activeNode, activePath, path);
             }
         }
-
         FileDialog {
             id: loadFileDialog
-            objectName: "loadFileDialog"
-            title: qsTr("Load Parameters")
-            fileMode: FileDialog.OpenFile
-            nameFilters: ["JSON/YAML Files (*.json *.yaml *.yml)", "All Files (*)"]
+
             property string activeNode: ""
             property string activePath: ""
+
+            fileMode: FileDialog.OpenFile
+            nameFilters: ["JSON/YAML Files (*.json *.yaml *.yml)", "All Files (*)"]
+            objectName: "loadFileDialog"
+            title: qsTr("Load Parameters")
+
             onAccepted: {
                 let path = loadFileDialog.selectedFile.toString();
                 if (path.startsWith("file://"))
@@ -196,26 +201,34 @@ Rectangle {
                 internalState.loadGroupParams(activeNode, activePath, path);
             }
         }
-
         ListView {
             id: treeView
-            objectName: "mainTreeView"
-            Layout.fillWidth: true
+
+            property var stateContext: internalState
+
             Layout.fillHeight: true
-            clip: true
+            Layout.fillWidth: true
             boundsBehavior: Flickable.StopAtBounds
+            clip: true
+            model: internalState.treeElements
+            objectName: "mainTreeView"
+
             ScrollBar.vertical: ScrollBar {
                 active: true
             }
-
-            property var stateContext: internalState
-            model: internalState.treeElements
-
             delegate: Rectangle {
                 id: rowRect
-                required property var modelData
-                required property int index
 
+                required property int index
+                property bool isSetting: {
+                    // Depend on parameterRevision so this re-evaluates when values change.
+                    let rev = internalState.parameterRevision;
+                    if (modelData.rowType === "param") {
+                        return ParameterService.isSetting(modelData.nodeName, modelData.paramName);
+                    }
+                    return false;
+                }
+                required property var modelData
                 property var paramValue: {
                     // Depend on parameterRevision so this re-evaluates when values change.
                     let rev = internalState.parameterRevision;
@@ -227,61 +240,57 @@ Rectangle {
                     return modelData.value;
                 }
 
-                property bool isSetting: {
-                    // Depend on parameterRevision so this re-evaluates when values change.
-                    let rev = internalState.parameterRevision;
-                    if (modelData.rowType === "param") {
-                        return ParameterService.isSetting(modelData.nodeName, modelData.paramName);
-                    }
-                    return false;
-                }
-
-                width: treeView.width - (treeView.ScrollBar.vertical.visible ? treeView.ScrollBar.vertical.width : 0)
-                height: Math.max(36, rowLayout.implicitHeight + 8)
-
-                color: {
-                    if (hoverHandler.hovered)
-                        return Qt.darker(palette.alternateBase, 1.1);
-                    return index % 2 == 0 ? palette.base : Qt.darker(palette.base, 1.02);
-                }
-
-                HoverHandler {
-                    id: hoverHandler
-                }
-
-                TapHandler {
-                    acceptedButtons: Qt.LeftButton
-                    onTapped: {
-                        if (modelData.rowType === "node" || modelData.rowType === "group") {
-                            rowRect.expandCollapseToggle();
-                        }
-                    }
-                }
-
                 function expandCollapseToggle() {
                     const fp = modelData.fullPath;
                     const nodeName = modelData.nodeName;
                     const isNode = modelData.rowType === "node";
                     const isExp = modelData.expanded;
-
                     let stateCtx = ListView.view.stateContext;
-
                     if (stateCtx.expandedState[fp]) {
                         delete stateCtx.expandedState[fp];
                     } else {
                         stateCtx.expandedState[fp] = true;
                     }
-
                     if (!isExp && isNode) {
                         if (stateCtx.acquiredNodes.indexOf(nodeName) === -1) {
                             stateCtx.acquiredNodes.push(nodeName);
                             ParameterService.acquire(nodeName);
                         }
                     }
-
                     stateCtx.rebuildModel();
                 }
+                function getEditorSource(type) {
+                    if (type === ParameterService.typeBool)
+                        return "elements/ParameterEditor/BoolParameterEditor.qml";
+                    if (type === ParameterService.typeInteger || type === ParameterService.typeDouble)
+                        return "elements/ParameterEditor/NumericParameterEditor.qml";
+                    if (type === ParameterService.typeString)
+                        return "elements/ParameterEditor/StringParameterEditor.qml";
+                    if (type >= ParameterService.typeByteArray && type <= ParameterService.typeStringArray)
+                        return "elements/ParameterEditor/ArrayParameterEditor.qml";
+                    return "";
+                }
 
+                color: {
+                    if (hoverHandler.hovered)
+                        return Qt.darker(palette.alternateBase, 1.1);
+                    return index % 2 == 0 ? palette.base : Qt.darker(palette.base, 1.02);
+                }
+                height: Math.max(36, rowLayout.implicitHeight + 8)
+                width: treeView.width - (treeView.ScrollBar.vertical.visible ? treeView.ScrollBar.vertical.width : 0)
+
+                HoverHandler {
+                    id: hoverHandler
+                }
+                TapHandler {
+                    acceptedButtons: Qt.LeftButton
+
+                    onTapped: {
+                        if (modelData.rowType === "node" || modelData.rowType === "group") {
+                            rowRect.expandCollapseToggle();
+                        }
+                    }
+                }
                 RowLayout {
                     id: rowLayout
                     anchors.fill: parent
@@ -290,119 +299,117 @@ Rectangle {
                     spacing: 8
 
                     IconButton {
-                        objectName: "rowExpandButton_" + modelData.fullPath
                         Layout.alignment: Qt.AlignVCenter | Qt.AlignLeft
+                        Layout.preferredHeight: visible ? 24 : 0
+                        Layout.preferredWidth: visible ? 24 : 0
                         flat: true
+                        objectName: "rowExpandButton_" + modelData.fullPath
+                        padding: 0
                         text: modelData.expanded ? IconFont.iconChevronDown : IconFont.iconChevronRight
                         visible: modelData.rowType === "node" || modelData.rowType === "group"
-                        Layout.preferredWidth: visible ? 24 : 0
-                        Layout.preferredHeight: visible ? 24 : 0
-                        padding: 0
+
                         onClicked: rowRect.expandCollapseToggle()
                     }
-
                     Label {
-                        text: modelData.displayName
+                        Layout.fillWidth: modelData.rowType !== "param"
+                        Layout.preferredWidth: modelData.rowType === "param" ? 220 : -1
+                        ToolTip.delay: 500
+                        ToolTip.text: modelData.description || ""
+                        ToolTip.visible: (hoverHandler.hovered && modelData.description && modelData.description !== "") ? true : false
+                        elide: Text.ElideRight
                         font.bold: modelData.rowType === "node" || modelData.rowType === "group"
                         font.pixelSize: modelData.rowType === "node" ? 14 : 13
                         opacity: modelData.readOnly ? 0.6 : 1.0
-                        Layout.fillWidth: modelData.rowType !== "param"
-                        Layout.preferredWidth: modelData.rowType === "param" ? 220 : -1
-                        elide: Text.ElideRight
-                        ToolTip.visible: (hoverHandler.hovered && modelData.description && modelData.description !== "") ? true : false
-                        ToolTip.text: modelData.description || ""
-                        ToolTip.delay: 500
+                        text: modelData.displayName
                     }
-
                     Loader {
                         id: editorLoader
-                        visible: modelData.rowType === "param"
-                        Layout.fillWidth: true
                         Layout.alignment: Qt.AlignVCenter
-                        source: getEditorSource(modelData.paramType)
+                        Layout.fillWidth: true
                         enabled: !rowRect.isSetting && !modelData.readOnly
+                        source: getEditorSource(modelData.paramType)
+                        visible: modelData.rowType === "param"
 
                         BusyIndicator {
-                            objectName: "busyIndicator_" + (modelData.paramName ?? "")
                             anchors.centerIn: parent
                             height: parent.height - 4
-                            width: height
-                            visible: rowRect.isSetting
+                            objectName: "busyIndicator_" + (modelData.paramName ?? "")
                             running: visible
+                            visible: rowRect.isSetting
+                            width: height
                         }
-
                         Binding {
-                            target: editorLoader.item
                             property: "modelData"
-                            value: modelData
                             restoreMode: Binding.RestoreBinding
+                            target: editorLoader.item
+                            value: modelData
                         }
                         Binding {
-                            target: editorLoader.item
                             property: "paramValue"
-                            value: rowRect.paramValue
                             restoreMode: Binding.RestoreBinding
-                        }
-
-                        Connections {
                             target: editorLoader.item
-                            ignoreUnknownSignals: true
-                            function onParameterSetFailed(paramName, reason) {
-                                toastManager.show(qsTr("Failed to set %1: %2").arg(paramName).arg(reason), "error");
-                            }
+                            value: rowRect.paramValue
+                        }
+                        Connections {
                             function onEditRequested(model, arrValue) {
                                 arrayEditDialog.openDialog(model, arrValue);
                             }
+                            function onParameterSetFailed(paramName, reason) {
+                                toastManager.show(qsTr("Failed to set %1: %2").arg(paramName).arg(reason), "error");
+                            }
+
+                            ignoreUnknownSignals: true
+                            target: editorLoader.item
                         }
                     }
-
                     IconButton {
-                        objectName: "reloadButton_" + (modelData.nodeName || "")
                         Layout.alignment: Qt.AlignVCenter | Qt.AlignRight
                         flat: true
+                        objectName: "reloadButton_" + (modelData.nodeName || "")
                         text: IconFont.iconRefresh
-                        visible: modelData.rowType === "node"
                         tooltipText: qsTr("Reload parameters...")
+                        visible: modelData.rowType === "node"
+
                         onClicked: {
                             ParameterService.refresh(modelData.nodeName);
                         }
                     }
-
                     IconButton {
-                        objectName: "saveParamsButton_" + (modelData.fullPath || modelData.nodeName || "")
                         Layout.alignment: Qt.AlignVCenter | Qt.AlignRight
                         flat: true
+                        objectName: "saveParamsButton_" + (modelData.fullPath || modelData.nodeName || "")
                         text: IconFont.iconSave
-                        visible: modelData.rowType === "node" || modelData.rowType === "group"
                         tooltipText: qsTr("Save parameters...")
+                        visible: modelData.rowType === "node" || modelData.rowType === "group"
+
                         onClicked: {
                             saveFileDialog.activeNode = modelData.nodeName;
                             saveFileDialog.activePath = modelData.rowType === "group" ? modelData.fullPath : "";
                             saveFileDialog.open();
                         }
                     }
-
                     IconButton {
-                        objectName: "loadParamsButton_" + (modelData.fullPath || modelData.nodeName || "")
                         Layout.alignment: Qt.AlignVCenter | Qt.AlignRight
                         flat: true
+                        objectName: "loadParamsButton_" + (modelData.fullPath || modelData.nodeName || "")
                         text: IconFont.iconLoad
-                        visible: modelData.rowType === "node" || modelData.rowType === "group"
                         tooltipText: qsTr("Load parameters...")
+                        visible: modelData.rowType === "node" || modelData.rowType === "group"
+
                         onClicked: {
                             loadFileDialog.activeNode = modelData.nodeName;
                             loadFileDialog.activePath = modelData.rowType === "group" ? modelData.fullPath : "";
                             loadFileDialog.open();
                         }
                     }
-
                     IconButton {
                         Layout.alignment: Qt.AlignVCenter | Qt.AlignRight
                         flat: true
-                        text: IconFont.iconStar
                         objectName: "rowStarButton_" + modelData.fullPath
-                        visible: modelData.rowType !== "loading"
                         opacity: modelData.starred ? 1.0 : (hovered ? 0.7 : 0.2)
+                        text: IconFont.iconStar
+                        visible: modelData.rowType !== "loading"
+
                         onClicked: {
                             let qa = context.quickAccess.slice();
                             let idx = qa.indexOf(modelData.fullPath);
@@ -416,32 +423,19 @@ Rectangle {
                         }
                     }
                 }
-
-                function getEditorSource(type) {
-                    if (type === ParameterService.typeBool)
-                        return "elements/ParameterEditor/BoolParameterEditor.qml";
-                    if (type === ParameterService.typeInteger || type === ParameterService.typeDouble)
-                        return "elements/ParameterEditor/NumericParameterEditor.qml";
-                    if (type === ParameterService.typeString)
-                        return "elements/ParameterEditor/StringParameterEditor.qml";
-                    if (type >= ParameterService.typeByteArray && type <= ParameterService.typeStringArray)
-                        return "elements/ParameterEditor/ArrayParameterEditor.qml";
-                    return "";
-                }
             }
         }
-
         RowLayout {
             Layout.fillWidth: true
 
             Button {
                 objectName: "loadAllButton"
                 text: qsTr("Load All")
+
                 onClicked: {
                     for (let i = 0; i < ParameterService.nodes.length; ++i) {
                         const nodeName = ParameterService.nodes[i];
                         internalState.expandedState[nodeName] = true;
-
                         if (internalState.acquiredNodes.indexOf(nodeName) === -1) {
                             internalState.acquiredNodes.push(nodeName);
                             ParameterService.acquire(nodeName);
@@ -450,92 +444,34 @@ Rectangle {
                     internalState.rebuildModel();
                 }
             }
-
             Label {
-                text: internalState.totalNodes > 0 ? qsTr("%1 parameters across %2 nodes").arg(internalState.totalParams).arg(internalState.totalNodes) : qsTr("No nodes discovered")
-                font.italic: true
-                opacity: 0.7
                 Layout.fillWidth: true
+                font.italic: true
                 horizontalAlignment: Text.AlignRight
+                opacity: 0.7
+                text: internalState.totalNodes > 0 ? qsTr("%1 parameters across %2 nodes").arg(internalState.totalParams).arg(internalState.totalNodes) : qsTr("No nodes discovered")
             }
         }
     }
-
     Timer {
         id: searchDebounceTimer
         interval: 300
         repeat: false
+
         onTriggered: {
             internalState.rebuildModel();
         }
     }
-
     QtObject {
         id: internalState
+
         property var acquiredNodes: []
         property var expandedState: ({})
+        property var knownNodeStates: ({})
+        property int parameterRevision: 0
         property int totalNodes: 0
         property int totalParams: 0
         property var treeElements: []
-        property var knownNodeStates: ({})
-        property int parameterRevision: 0
-
-        function saveGroupParams(nodeName, fullPath, filePath) {
-            let data = ParameterService.getNodeData(nodeName);
-            if (!data || !data.loaded)
-                return;
-            let groupParams = {};
-
-            let relativePath = ModelLogic.getRelativePath(nodeName, fullPath);
-
-            let prefix = relativePath ? relativePath + "." : "";
-
-            for (let paramName in data.parameters) {
-                if (relativePath && !paramName.startsWith(prefix))
-                    continue; // Skip parameters not in the current group
-
-                let key = relativePath ? paramName.substring(prefix.length) : paramName;
-
-                let p = data.parameters[paramName];
-                let val = p.value;
-
-                // Force casting to JS primitives because QVariants might be ignored by JSON.stringify
-                if (p.type === ParameterService.typeBool)
-                    val = !!val;
-                else if (p.type === ParameterService.typeInteger)
-                    val = Number(val);
-                else if (p.type === ParameterService.typeDouble)
-                    val = Number(val);
-                else if (p.type === ParameterService.typeString)
-                    val = String(val);
-                else if (p.type >= ParameterService.typeByteArray) {
-                    val = MessageUtils.toJavaScriptObject(val);
-                    if (!Array.isArray(val)) {
-                        val = [val];
-                    }
-                }
-
-                // Create nested ROS 2 standard format
-                let parts = key.split(".");
-                let current = groupParams;
-                for (let j = 0; j < parts.length - 1; j++) {
-                    if (!current[parts[j]])
-                        current[parts[j]] = {};
-                    current = current[parts[j]];
-                }
-                current[parts[parts.length - 1]] = val;
-            }
-
-            if (filePath.endsWith(".json")) {
-                let success = RQml.writeFile(filePath, JSON.stringify(groupParams, null, 2));
-                if (!success)
-                    toastManager.show(qsTr("Failed to save JSON to %1").arg(filePath), "error");
-            } else if (filePath.endsWith(".yaml") || filePath.endsWith(".yml")) {
-                let success = Ros2.io.writeYaml(filePath, groupParams);
-                if (!success)
-                    toastManager.show(qsTr("Failed to save YAML to %1").arg(filePath), "error");
-            }
-        }
 
         function loadGroupParams(nodeName, fullPath, filePath) {
             let groupParams = null;
@@ -565,7 +501,6 @@ Rectangle {
                 let keyList = [];
                 for (let key in obj)
                     keyList.push(key);
-
                 for (let i = 0; i < keyList.length; i++) {
                     let key = keyList[i];
                     if (obj[key] !== null && typeof obj[key] === "object" && !Array.isArray(obj[key])) {
@@ -576,15 +511,11 @@ Rectangle {
                 }
             }
             flatten(groupParams, "");
-
             let data = ParameterService.getNodeData(nodeName);
             if (!data || !data.loaded)
                 return;
-
             let relativePath = ModelLogic.getRelativePath(nodeName, fullPath);
-
             let targetPrefix = relativePath ? relativePath + "." : "";
-
             for (let incomingKey in flatParams) {
                 let valToSet = flatParams[incomingKey];
 
@@ -604,66 +535,53 @@ Rectangle {
                         matchedName = targetPrefix + nakedKey;
                     }
                 }
-
                 if (matchedName && !data.parameters[matchedName].descriptor.readOnly) {
-                    ParameterService.setParameter(nodeName, matchedName, valToSet, data.parameters[matchedName].type, function(success, reason) {
-                        if (!success) {
-                            toastManager.show(qsTr("Failed to load %1: %2").arg(matchedName).arg(reason), "error");
-                        }
-                    });
+                    ParameterService.setParameter(nodeName, matchedName, valToSet, data.parameters[matchedName].type, function (success, reason) {
+                            if (!success) {
+                                toastManager.show(qsTr("Failed to load %1: %2").arg(matchedName).arg(reason), "error");
+                            }
+                        });
                 }
             }
         }
-
         function rebuildModel() {
             let currentScrollY = treeView.contentY;
-
             let newModel = [];
             let _totalNodes = 0;
             let _totalParams = 0;
             const nodes = ParameterService.nodes || [];
             const filterText = filterTextField.text.toLowerCase();
             const showStarredOnly = context.showStarredOnly ?? false;
-
             const stateContext = {
-                filterText: filterText,
-                showStarredOnly: showStarredOnly,
-                quickAccess: context.quickAccess || [],
-                expandedState: internalState.expandedState
+                "filterText": filterText,
+                "showStarredOnly": showStarredOnly,
+                "quickAccess": context.quickAccess || [],
+                "expandedState": internalState.expandedState
             };
-
             for (let i = 0; i < nodes.length; i++) {
                 const nodeName = nodes[i];
                 let isNodeExpanded = !!internalState.expandedState[nodeName];
-
                 const data = ParameterService.getNodeData(nodeName);
                 let treeParams = data && data.loaded ? data.parameters : {};
-
                 let treeRes = ModelLogic.buildParameterTree(treeParams);
                 let rootNode = treeRes.rootNode;
                 let paramCount = treeRes.paramCount;
-
                 if (paramCount > 0) {
                     _totalNodes++;
                     _totalParams += paramCount;
                 }
-
                 let childrenKeys = [];
                 for (let childKey in rootNode.__children)
                     childrenKeys.push(childKey);
                 childrenKeys.sort();
-
                 let nodeChildItems = [];
                 let nodeHasVisibleChildren = false;
                 let nodeHasStarred = false;
-
                 if (filterText !== "" || showStarredOnly)
                     isNodeExpanded = true;
-
                 let nodeIsStarred = context.quickAccess.indexOf(nodeName) !== -1;
                 if (nodeIsStarred)
                     nodeHasStarred = true;
-
                 for (let keyIndex = 0; keyIndex < childrenKeys.length; keyIndex++) {
                     let childRes = ModelLogic.flattenTree(childrenKeys[keyIndex], rootNode.__children[childrenKeys[keyIndex]], nodeName, 1, nodeName, nodeIsStarred, stateContext);
                     if (childRes.hasVisibleChildren)
@@ -674,24 +592,20 @@ Rectangle {
                         nodeChildItems = nodeChildItems.concat(childRes.items);
                     }
                 }
-
                 let nodeMatches = filterText === "" || nodeName.toLowerCase().indexOf(filterText) !== -1;
                 let nodeVisible = (nodeMatches || nodeHasVisibleChildren) && (!showStarredOnly || nodeHasStarred || nodeHasVisibleChildren);
-
                 if (nodeVisible) {
                     let title = nodeName + (data && data.loaded ? " (" + paramCount + ")" : "");
-
                     newModel.push({
-                        rowType: "node",
-                        displayName: title,
-                        fullPath: nodeName,
-                        depth: 0,
-                        expanded: isNodeExpanded,
-                        starred: nodeIsStarred,
-                        nodeName: nodeName,
-                        paramName: ""
-                    });
-
+                            "rowType": "node",
+                            "displayName": title,
+                            "fullPath": nodeName,
+                            "depth": 0,
+                            "expanded": isNodeExpanded,
+                            "starred": nodeIsStarred,
+                            "nodeName": nodeName,
+                            "paramName": ""
+                        });
                     if (isNodeExpanded && data) {
                         if (data.loaded) {
                             for (let c = 0; c < nodeChildItems.length; c++) {
@@ -699,33 +613,82 @@ Rectangle {
                             }
                         } else if (data.loading) {
                             newModel.push({
-                                rowType: "loading",
-                                displayName: "Loading...",
-                                fullPath: nodeName + "/loading",
-                                depth: 1,
-                                expanded: false,
-                                starred: false,
-                                nodeName: nodeName,
-                                paramName: ""
-                            });
+                                    "rowType": "loading",
+                                    "displayName": "Loading...",
+                                    "fullPath": nodeName + "/loading",
+                                    "depth": 1,
+                                    "expanded": false,
+                                    "starred": false,
+                                    "nodeName": nodeName,
+                                    "paramName": ""
+                                });
                         }
                     }
                 }
             }
             internalState.totalNodes = _totalNodes || nodes.length;
             internalState.totalParams = _totalParams;
-
             internalState.treeElements = newModel;
             treeView.model = newModel;
 
             // Restore scroll state securely by waiting for the view layout
             Qt.callLater(function () {
-                if (currentScrollY > 0 && currentScrollY <= Math.max(0, treeView.contentHeight - treeView.height)) {
-                    treeView.contentY = currentScrollY;
-                } else if (currentScrollY > 0) {
-                    treeView.positionViewAtEnd();
+                    if (currentScrollY > 0 && currentScrollY <= Math.max(0, treeView.contentHeight - treeView.height)) {
+                        treeView.contentY = currentScrollY;
+                    } else if (currentScrollY > 0) {
+                        treeView.positionViewAtEnd();
+                    }
+                });
+        }
+        function saveGroupParams(nodeName, fullPath, filePath) {
+            let data = ParameterService.getNodeData(nodeName);
+            if (!data || !data.loaded)
+                return;
+            let groupParams = {};
+            let relativePath = ModelLogic.getRelativePath(nodeName, fullPath);
+            let prefix = relativePath ? relativePath + "." : "";
+            for (let paramName in data.parameters) {
+                if (relativePath && !paramName.startsWith(prefix))
+                    continue; // Skip parameters not in the current group
+                let key = relativePath ? paramName.substring(prefix.length) : paramName;
+                let p = data.parameters[paramName];
+                let val = p.value;
+
+                // Force casting to JS primitives because QVariants might be ignored by JSON.stringify
+                if (p.type === ParameterService.typeBool)
+                    val = !!val;
+                else if (p.type === ParameterService.typeInteger)
+                    val = Number(val);
+                else if (p.type === ParameterService.typeDouble)
+                    val = Number(val);
+                else if (p.type === ParameterService.typeString)
+                    val = String(val);
+                else if (p.type >= ParameterService.typeByteArray) {
+                    val = MessageUtils.toJavaScriptObject(val);
+                    if (!Array.isArray(val)) {
+                        val = [val];
+                    }
                 }
-            });
+
+                // Create nested ROS 2 standard format
+                let parts = key.split(".");
+                let current = groupParams;
+                for (let j = 0; j < parts.length - 1; j++) {
+                    if (!current[parts[j]])
+                        current[parts[j]] = {};
+                    current = current[parts[j]];
+                }
+                current[parts[parts.length - 1]] = val;
+            }
+            if (filePath.endsWith(".json")) {
+                let success = RQml.writeFile(filePath, JSON.stringify(groupParams, null, 2));
+                if (!success)
+                    toastManager.show(qsTr("Failed to save JSON to %1").arg(filePath), "error");
+            } else if (filePath.endsWith(".yaml") || filePath.endsWith(".yml")) {
+                let success = Ros2.io.writeYaml(filePath, groupParams);
+                if (!success)
+                    toastManager.show(qsTr("Failed to save YAML to %1").arg(filePath), "error");
+            }
         }
     }
 }

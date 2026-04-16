@@ -10,8 +10,10 @@ import RQml.Fonts
 
 Rectangle {
     id: root
-    anchors.fill: parent
+
     property var kddockwidgets_min_size: Qt.size(600, 500)
+
+    anchors.fill: parent
     color: palette.base
 
     ColumnLayout {
@@ -21,15 +23,6 @@ Rectangle {
         RowLayout {
             FuzzySelector {
                 id: topicSelect
-                objectName: "imageTopicSelector"
-                Layout.fillWidth: true
-                placeholderText: qsTr("Image Topic")
-                text: context.topic ?? ""
-                onTextChanged: {
-                    if (text === context.topic)
-                        return;
-                    context.topic = text;
-                }
                 function refresh() {
                     let topics = Ros2.queryTopics("sensor_msgs/msg/Image");
                     let compressedTopics = Ros2.queryTopics("sensor_msgs/msg/CompressedImage");
@@ -43,7 +36,18 @@ Rectangle {
                     }
                     model = topics;
                 }
+
+                Layout.fillWidth: true
+                objectName: "imageTopicSelector"
+                placeholderText: qsTr("Image Topic")
+                text: context.topic ?? ""
+
                 Component.onCompleted: refresh()
+                onTextChanged: {
+                    if (text === context.topic)
+                        return;
+                    context.topic = text;
+                }
             }
             RefreshButton {
                 id: refreshButton
@@ -55,94 +59,97 @@ Rectangle {
             }
             IconToggleButton {
                 id: playButton
-                objectName: "imagePlayButton"
                 checked: context.enabled ?? true
+                iconOff: IconFont.iconPlay
+                iconOn: IconFont.iconPause
+                objectName: "imagePlayButton"
+                tooltipTextOff: qsTr("Click to start")
+                tooltipTextOn: qsTr("Click to pause")
+
                 onToggled: {
                     if (context.enabled === checked)
                         return;
                     context.enabled = checked;
                 }
-                iconOn: IconFont.iconPause
-                iconOff: IconFont.iconPlay
-                tooltipTextOn: qsTr("Click to pause")
-                tooltipTextOff: qsTr("Click to start")
             }
             IconButton {
                 id: saveButton
                 objectName: "imageSaveButton"
-                tooltipText: qsTr("Save Image")
                 text: IconFont.iconSave
+                tooltipText: qsTr("Save Image")
+
                 onClicked: fileDialog.saveImage()
             }
         }
-
         RowLayout {
             Layout.fillWidth: true
+
             RowLayout {
                 visible: !imageSubscriber.isColor
+
                 CheckBox {
+                    checked: context.invert ?? false
                     objectName: "imageInvertCheckbox"
                     text: qsTr("Invert")
-                    checked: context.invert ?? false
+
                     onToggled: {
                         context.invert = checked;
                     }
                 }
                 CheckBox {
+                    checked: context.colorize ?? false
                     objectName: "imageColorizeCheckbox"
                     text: qsTr("Colorize")
-                    checked: context.colorize ?? false
+
                     onToggled: {
                         context.colorize = checked;
                     }
                 }
                 DecimalSpinBox {
-                    objectName: "imageDepthSpinBox"
-                    visible: d.isDepthCamera(imageSubscriber.encoding)
-                    implicitWidth: 132
                     from: 0.0
-                    to: 999
+                    implicitWidth: 132
+                    objectName: "imageDepthSpinBox"
                     suffix: "m"
+                    to: 999
+                    visible: d.isDepthCamera(imageSubscriber.encoding)
+
+                    Component.onCompleted: value = context.depth ?? 3.0
                     onValueChanged: {
                         if (context.depth === value)
                             return;
                         context.depth = value;
                     }
-                    Component.onCompleted: value = context.depth ?? 3.0
                 }
             }
-
             Item {
                 Layout.fillWidth: true
             }
-
             IconButton {
                 objectName: "imageRotateLeftButton"
                 text: IconFont.iconRotateLeft
                 tooltipText: qsTr("Rotate Left")
+
                 onClicked: context.rotation = ((context.rotation ?? 0) - 90 + 360) % 360
             }
             Label {
-                objectName: "imageRotationLabel"
                 Layout.preferredWidth: 48
-                text: (context.rotation ?? 0) + "°"
                 horizontalAlignment: Text.AlignHCenter
+                objectName: "imageRotationLabel"
+                text: (context.rotation ?? 0) + "°"
                 verticalAlignment: Text.AlignVCenter
             }
             IconButton {
                 objectName: "imageRotateRightButton"
                 text: IconFont.iconRotateRight
                 tooltipText: qsTr("Rotate Right")
+
                 onClicked: context.rotation = ((context.rotation ?? 0) + 90) % 360
             }
         }
-
         VideoOutput {
             id: videoOutput
-            Layout.fillWidth: true
             Layout.fillHeight: true
-            orientation: context.rotation ?? 0
-
+            Layout.fillWidth: true
             layer.enabled: {
                 if (imageSubscriber.hasAlpha)
                     return true;
@@ -154,8 +161,14 @@ Rectangle {
                     return true;
                 return false;
             }
+            orientation: context.rotation ?? 0
+            smooth: false
+
             layer.effect: ShaderEffect {
                 property rect cRect: videoOutput.contentRect
+                property var colormap: Image {
+                    source: "shaders/turbo.png"
+                }
                 property int flags: {
                     let f = 0;
                     if (context.invert ?? false)
@@ -164,15 +177,12 @@ Rectangle {
                         f |= 2;
                     return f;
                 }
-                property var colormap: Image {
-                    source: "shaders/turbo.png"
-                }
+                property real xMax: videoOutput.width > 0 ? (cRect.x + cRect.width) / videoOutput.width : 1.0
 
                 // Calculate normalized min/max (0.0 - 1.0)
                 property real xMin: videoOutput.width > 0 ? cRect.x / videoOutput.width : 0.0
-                property real xMax: videoOutput.width > 0 ? (cRect.x + cRect.width) / videoOutput.width : 1.0
-                property real yMin: videoOutput.height > 0 ? cRect.y / videoOutput.height : 0.0
                 property real yMax: videoOutput.height > 0 ? (cRect.y + cRect.height) / videoOutput.height : 1.0
+                property real yMin: videoOutput.height > 0 ? cRect.y / videoOutput.height : 0.0
 
                 fragmentShader: {
                     if (imageSubscriber.hasAlpha)
@@ -182,7 +192,6 @@ Rectangle {
                     return "";
                 }
             }
-            smooth: false
 
             // Processes depth images, forwards all other images unchanged
             DepthImageProcessor {
@@ -190,14 +199,13 @@ Rectangle {
                 maxDepth: context.depth ?? 3.0
                 outputVideoSink: videoOutput.videoSink
             }
-
             ImageTransportSubscription {
                 id: imageSubscriber
-                topic: d.topicInformation?.topic ?? ""
                 defaultTransport: d.topicInformation?.transport ?? "raw"
                 enabled: context.enabled ?? true
-                videoSink: depthProcessor.videoSink
                 timeout: 3000
+                topic: d.topicInformation?.topic ?? ""
+                videoSink: depthProcessor.videoSink
             }
         }
 
@@ -220,9 +228,9 @@ Rectangle {
             }
         }
     }
-
     QtObject {
         id: d
+
         property int _recheckTrigger: 0
         property var topicInformation: {
             _recheckTrigger;
@@ -234,18 +242,21 @@ Rectangle {
             const isRaw = types.indexOf("sensor_msgs/msg/Image") != -1 || context.topic.endsWith("/image_raw");
             if (isRaw) {
                 return {
-                    topic: context.topic,
-                    transport: "raw"
-                }
+                    "topic": context.topic,
+                    "transport": "raw"
+                };
             }
             const parts = context.topic.split("/");
             if (parts.length < 2)
-                return {topic: context.topic, transport: "raw"};
+                return {
+                    "topic": context.topic,
+                    "transport": "raw"
+                };
             const topic = parts.slice(0, parts.length - 1).join("/");
             const transport = parts[parts.length - 1];
             return {
-                topic: topic,
-                transport: transport
+                "topic": topic,
+                "transport": transport
             };
         }
 
@@ -253,23 +264,28 @@ Rectangle {
             return encoding === "32FC1" || encoding === "16UC1" || encoding === "mono16";
         }
     }
-
     Timer {
         interval: 500
         repeat: true
         running: imageSubscriber.enabled && !imageSubscriber.subscribed
+
         onTriggered: {
             d._recheckTrigger++;
         }
     }
-
     FileDialog {
         id: fileDialog
+        function saveImage() {
+            depthProcessor.grabFrame();
+            open();
+        }
+
+        defaultSuffix: "png"
+        fileMode: FileDialog.SaveFile
+        nameFilters: ["Images (*.png *.jpg *.jpeg *.bmp)"]
         objectName: "imageSaveFileDialog"
         title: qsTr("Save Image")
-        fileMode: FileDialog.SaveFile
-        defaultSuffix: "png"
-        nameFilters: ["Images (*.png *.jpg *.jpeg *.bmp)"]
+
         onAccepted: {
             let path = fileDialog.selectedFile.toString();
             if (path.startsWith("file://"))
@@ -279,11 +295,6 @@ Rectangle {
         }
         onRejected: {
             depthProcessor.clearGrabbedFrame();
-        }
-
-        function saveImage() {
-            depthProcessor.grabFrame();
-            open();
         }
     }
 }

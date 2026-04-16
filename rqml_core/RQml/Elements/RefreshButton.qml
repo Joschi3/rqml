@@ -14,52 +14,60 @@
  *  You should have received a copy of the GNU General Public License
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-
 import QtQuick
 import QtQuick.Controls
 import RQml.Fonts
 
 RoundButton {
-  id: control
-  implicitWidth: implicitHeight
-  font.family: IconFont.name
-  font.pixelSize: 18
-  text: IconFont.iconRefresh
-  radius: 4
-  property bool animate
-  onAnimateChanged: {
-    if (!animate) return
-    reloadRotationAnimator.running = true
-  }
-  contentItem: Label {
-    id: reloadIcon
-    anchors.centerIn: control
-    width: Math.min(control.width - control.padding, control.height - control.padding)
-    height: width
-    font: control.font
-    text: control.text
-    horizontalAlignment: Text.AlignHCenter
-    verticalAlignment: Text.AlignVCenter
+    id: control
 
-    SequentialAnimation {
-      id: reloadRotationAnimator
-      loops: Animation.Infinite
-      running: false
+    property bool animate
 
-      RotationAnimation {
-        target: reloadIcon
-        from: 0; to: 360
-        duration: 600
-        easing.type: Easing.InOutQuad
-      }
-      PauseAnimation { duration: 400 }
-      // Check if we should rotate another time
-      ScriptAction {
-        script: {
-          if (control.animate) return
-          reloadRotationAnimator.running = false
+    font.family: IconFont.name
+    font.pixelSize: 18
+    implicitWidth: implicitHeight
+    radius: 4
+    text: IconFont.iconRefresh
+
+    contentItem: Label {
+        id: reloadIcon
+        anchors.centerIn: control
+        font: control.font
+        height: width
+        horizontalAlignment: Text.AlignHCenter
+        text: control.text
+        verticalAlignment: Text.AlignVCenter
+        width: Math.min(control.width - control.padding, control.height - control.padding)
+
+        SequentialAnimation {
+            id: reloadRotationAnimator
+            loops: Animation.Infinite
+            running: false
+
+            RotationAnimation {
+                duration: 600
+                easing.type: Easing.InOutQuad
+                from: 0
+                target: reloadIcon
+                to: 360
+            }
+            PauseAnimation {
+                duration: 400
+            }
+            // Check if we should rotate another time
+            ScriptAction {
+                script: {
+                    if (control.animate)
+                        return;
+                    reloadRotationAnimator.running = false;
+                }
+            }
         }
-      }
     }
-  }
+
+    onAnimateChanged: {
+        if (!animate)
+            return;
+        reloadRotationAnimator.running = true;
+    }
 }

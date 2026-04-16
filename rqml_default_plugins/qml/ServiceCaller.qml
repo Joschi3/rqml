@@ -6,8 +6,10 @@ import RQml.Elements
 
 Rectangle {
     id: root
-    anchors.fill: parent
+
     property var kddockwidgets_min_size: Qt.size(350, 350)
+
+    anchors.fill: parent
     color: palette.base
 
     ColumnLayout {
@@ -20,16 +22,6 @@ Rectangle {
 
             FuzzySelector {
                 id: serviceSelect
-                objectName: "serviceTopicSelector"
-                Layout.fillWidth: true
-                placeholderText: qsTr("Service Topic")
-                text: context.service ?? ""
-                onTextChanged: {
-                    if (text === context.service)
-                        return;
-                    context.service = text;
-                    typeSelect.refresh();
-                }
                 function refresh() {
                     let services = Ros2.queryServices();
                     if (!(context.showDefaultServices ?? false)) {
@@ -44,7 +36,19 @@ Rectangle {
                     }
                     model = services;
                 }
+
+                Layout.fillWidth: true
+                objectName: "serviceTopicSelector"
+                placeholderText: qsTr("Service Topic")
+                text: context.service ?? ""
+
                 Component.onCompleted: refresh()
+                onTextChanged: {
+                    if (text === context.service)
+                        return;
+                    context.service = text;
+                    typeSelect.refresh();
+                }
             }
             RefreshButton {
                 id: refreshServicesButton
@@ -56,20 +60,6 @@ Rectangle {
             }
             FuzzySelector {
                 id: typeSelect
-                objectName: "serviceTypeSelector"
-                Layout.fillWidth: true
-                placeholderText: qsTr("Service Type")
-                text: context.type ?? ""
-                onTextChanged: {
-                    if (text === context.type)
-                        return;
-                    context.type = text;
-                    if (!context.type)
-                        return;
-                    if (requestModel.message && requestModel.message["#messageType"] === context.type + "_Request")
-                        return;
-                    tabBar.currentIndex = 0;
-                }
                 function refresh() {
                     let types = !!context.service ? Ros2.getServiceTypes(context.service) : [];
                     if (types.length == 0)
@@ -81,7 +71,23 @@ Rectangle {
                         typeSelect.text = types.length > 0 ? types[0] : "";
                     }
                 }
+
+                Layout.fillWidth: true
+                objectName: "serviceTypeSelector"
+                placeholderText: qsTr("Service Type")
+                text: context.type ?? ""
+
                 Component.onCompleted: refresh()
+                onTextChanged: {
+                    if (text === context.type)
+                        return;
+                    context.type = text;
+                    if (!context.type)
+                        return;
+                    if (requestModel.message && requestModel.message["#messageType"] === context.type + "_Request")
+                        return;
+                    tabBar.currentIndex = 0;
+                }
             }
             RefreshButton {
                 onClicked: {
@@ -93,72 +99,75 @@ Rectangle {
         }
         TabBar {
             id: tabBar
-            objectName: "serviceTabBar"
             Layout.fillWidth: true
+            objectName: "serviceTabBar"
+
             TabButton {
                 text: qsTr("Request")
             }
             TabButton {
-                text: qsTr("Response")
                 enabled: d.response !== null || d.isActive
+                text: qsTr("Response")
             }
         }
-
         StackLayout {
-            Layout.fillWidth: true
             Layout.fillHeight: true
+            Layout.fillWidth: true
             currentIndex: tabBar.currentIndex
 
             // Request Tab
             ColumnLayout {
-                Layout.fillWidth: true
                 Layout.fillHeight: true
+                Layout.fillWidth: true
+
                 MessageContentEditor {
                     id: requestEditor
-                    Layout.fillWidth: true
                     Layout.fillHeight: true
+                    Layout.fillWidth: true
+                    readonly: false
+
                     model: MessageItemModel {
                         id: requestModel
+                        Component.onCompleted: message = context.request ?? null
                         onModified: {
                             if (message == context.request)
                                 return;
                             context.request = message;
                         }
-                        Component.onCompleted: message = context.request ?? null
                     }
-                    readonly: false
                 }
                 RowLayout {
                     Layout.fillWidth: true
+
                     Button {
-                        objectName: "serviceResetButton"
                         enabled: !!context.type
                         implicitWidth: 120
+                        objectName: "serviceResetButton"
                         text: qsTr("Reset")
+
                         onClicked: {
                             context.request = Ros2.createEmptyServiceRequest(context.type);
                             requestModel.message = context.request;
                         }
                     }
-
                     Item {
                         Layout.fillWidth: true
                     } // Spacer
-
                     Button {
-                        objectName: "serviceSendButton"
                         enabled: (d.client?.ready && !d.isActive) ?? false
                         implicitWidth: 120
+                        objectName: "serviceSendButton"
                         text: qsTr("Send")
+
                         onClicked: {
                             d.resetState();
                             d.isActive = true;
                             tabBar.currentIndex = 1;
                             d.client.sendRequestAsync(requestEditor.model.message, function (response) {
-                                tabBar.currentIndex = 1;
-                                d.response = response;
-                                d.isActive = false;
-                            });
+                                    tabBar.currentIndex = 1;
+                                    d.response = response;
+                                    d.isActive = false;
+                                });
                         }
                     }
                 }
@@ -166,15 +175,18 @@ Rectangle {
 
             // Response Tab
             ColumnLayout {
-                Layout.fillWidth: true
                 Layout.fillHeight: true
+                Layout.fillWidth: true
+
                 Item {
-                    Layout.fillWidth: true
                     Layout.fillHeight: true
+                    Layout.fillWidth: true
+
                     Rectangle {
-                        visible: !responseEditor.visible
                         anchors.fill: parent
                         color: root.palette.base
+                        visible: !responseEditor.visible
+
                         Label {
                             anchors.centerIn: parent
                             text: d.response === null ? "Waiting for response..." : "Service call failed."
@@ -183,40 +195,41 @@ Rectangle {
                     MessageContentEditor {
                         id: responseEditor
                         anchors.fill: parent
-                        visible: !!d.client && !!d.response
                         readonly: true
+                        visible: !!d.client && !!d.response
+
                         model: MessageItemModel {
                             message: d.response || null
+
                             onMessageChanged: responseEditor.expandRecursively()
                         }
                     }
                 }
-
                 RowLayout {
                     Layout.fillWidth: true
 
                     Item {
                         Layout.fillWidth: true
                     } // Spacer
-
                     Button {
                         implicitWidth: 120
                         text: qsTr("Back")
+
                         onClicked: tabBar.currentIndex = 0
                     }
                 }
             }
         }
-
         RowLayout {
             Layout.fillWidth: true
+
             Label {
                 text: "Status: "
             }
             Label {
                 id: statusText
-                objectName: "serviceStatusLabel"
                 Layout.fillWidth: true
+                objectName: "serviceStatusLabel"
                 text: {
                     if (!d.client)
                         return "Not connected";
@@ -227,12 +240,12 @@ Rectangle {
                     return "Connecting...";
                 }
             }
-
             CheckBox {
                 id: showDefaultServicesCheck
+                checked: context.showDefaultServices ?? false
                 objectName: "showDefaultServicesCheckbox"
                 text: qsTr("Show default services")
-                checked: context.showDefaultServices ?? false
+
                 onCheckedChanged: {
                     if (context.showDefaultServices !== checked) {
                         context.showDefaultServices = checked;
@@ -242,9 +255,9 @@ Rectangle {
             }
         }
     }
-
     QtObject {
         id: d
+
         // Incremented by the timer to re-evaluate the client binding without changing service/type.
         property int _tick: 0
         property var client: {
@@ -256,19 +269,20 @@ Rectangle {
                 return null;
             return Ros2.createServiceClient(context.service, context.type);
         }
-        onClientChanged: {
-            resetState();
-            if (client && (!requestModel.message || requestModel.message["#messageType"] !== context.type + "_Request")) {
-                context.request = Ros2.createEmptyServiceRequest(context.type);
-                requestModel.message = context.request;
-            }
-        }
         property bool isActive: false
         property var response: null
 
         function resetState() {
             isActive = false;
             response = null;
+        }
+
+        onClientChanged: {
+            resetState();
+            if (client && (!requestModel.message || requestModel.message["#messageType"] !== context.type + "_Request")) {
+                context.request = Ros2.createEmptyServiceRequest(context.type);
+                requestModel.message = context.request;
+            }
         }
     }
 
@@ -277,6 +291,7 @@ Rectangle {
         interval: 500
         repeat: true
         running: !!context.service && !!context.type && !d.client
+
         onTriggered: d._tick++
     }
 }

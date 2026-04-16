@@ -7,8 +7,10 @@ import RQml.Fonts
 
 Rectangle {
     id: root
-    anchors.fill: parent
+
     property var kddockwidgets_min_size: Qt.size(350, 500)
+
+    anchors.fill: parent
     color: palette.base
 
     Component.onCompleted: {
@@ -20,6 +22,7 @@ Rectangle {
 
     QtObject {
         id: d
+
         property var publisher: {
             if (!context.topic || !Ros2.isValidTopic(context.topic))
                 return null;
@@ -31,46 +34,45 @@ Rectangle {
                 return;
             if (stampedCheckBox.checked) {
                 publisher.publish({
-                    header: {
-                        stamp: Ros2.now()
-                    },
-                    twist: {
-                        linear: {
-                            x: linearSlider.value,
-                            y: 0,
-                            z: 0
+                        "header": {
+                            "stamp": Ros2.now()
                         },
-                        angular: {
-                            x: 0,
-                            y: 0,
-                            z: angularSlider.value
+                        "twist": {
+                            "linear": {
+                                "x": linearSlider.value,
+                                "y": 0,
+                                "z": 0
+                            },
+                            "angular": {
+                                "x": 0,
+                                "y": 0,
+                                "z": angularSlider.value
+                            }
                         }
-                    }
-                });
+                    });
             } else {
                 publisher.publish({
-                    linear: {
-                        x: linearSlider.value,
-                        y: 0,
-                        z: 0
-                    },
-                    angular: {
-                        x: 0,
-                        y: 0,
-                        z: angularSlider.value
-                    }
-                });
+                        "linear": {
+                            "x": linearSlider.value,
+                            "y": 0,
+                            "z": 0
+                        },
+                        "angular": {
+                            "x": 0,
+                            "y": 0,
+                            "z": angularSlider.value
+                        }
+                    });
             }
         }
     }
-
     Timer {
         interval: rate.value == 0 ? 0 : 1000 / rate.value
         repeat: true
         running: rate.value > 0
+
         onTriggered: d.publish()
     }
-
     ColumnLayout {
         anchors.fill: parent
         anchors.margins: 8
@@ -78,24 +80,6 @@ Rectangle {
         RowLayout {
             FuzzySelector {
                 id: topicSelect
-                objectName: "steeringTopicSelector"
-                Layout.fillWidth: true
-                placeholderText: qsTr("Velocity Topic")
-                onTextChanged: {
-                    if (text === context.topic)
-                        return;
-                    context.enabled = false;
-                    context.topic = text;
-                    if (!Ros2.isValidTopic(text))
-                        return;
-                    const types = Ros2.queryTopicTypes(text);
-                    const hasTwist = types.includes("geometry_msgs/msg/Twist");
-                    const hasStamped = types.includes("geometry_msgs/msg/TwistStamped");
-                    if (hasTwist && !hasStamped)
-                        stampedCheckBox.checked = false;
-                    else if (hasStamped && !hasTwist)
-                        stampedCheckBox.checked = true;
-                }
                 function refresh() {
                     let topics = Ros2.queryTopics("geometry_msgs/msg/Twist");
                     let stampedTopics = Ros2.queryTopics("geometry_msgs/msg/TwistStamped");
@@ -111,9 +95,29 @@ Rectangle {
                     }
                     model = topics;
                 }
+
+                Layout.fillWidth: true
+                objectName: "steeringTopicSelector"
+                placeholderText: qsTr("Velocity Topic")
+
                 Component.onCompleted: {
                     text = context.topic ?? "/cmd_vel";
                     refresh();
+                }
+                onTextChanged: {
+                    if (text === context.topic)
+                        return;
+                    context.enabled = false;
+                    context.topic = text;
+                    if (!Ros2.isValidTopic(text))
+                        return;
+                    const types = Ros2.queryTopicTypes(text);
+                    const hasTwist = types.includes("geometry_msgs/msg/Twist");
+                    const hasStamped = types.includes("geometry_msgs/msg/TwistStamped");
+                    if (hasTwist && !hasStamped)
+                        stampedCheckBox.checked = false;
+                    else if (hasStamped && !hasTwist)
+                        stampedCheckBox.checked = true;
                 }
             }
             RefreshButton {
@@ -124,30 +128,31 @@ Rectangle {
                 }
             }
         }
-
         RowLayout {
             spacing: 10
+
             CheckBox {
                 id: stampedCheckBox
-                objectName: "steeringStampedCheckbox"
-                display: AbstractButton.TextUnderIcon
-                text: "Stamped"
                 checked: !!context.stamped
+                display: AbstractButton.TextUnderIcon
+                objectName: "steeringStampedCheckbox"
+                text: "Stamped"
+
                 onCheckedChanged: context.stamped = checked
             }
-
             Label {
                 text: "Rate (Hz):"
             }
             SpinBox {
                 id: rate
-                objectName: "steeringRateSpinBox"
                 editable: true
                 from: 0
-                to: 100
+                objectName: "steeringRateSpinBox"
                 stepSize: 1
-                onValueChanged: context.rate = value
+                to: 100
+
                 Component.onCompleted: value = context.rate ?? 10
+                onValueChanged: context.rate = value
             }
             // Spacer
             Item {
@@ -155,57 +160,58 @@ Rectangle {
             }
             Button {
                 id: playButton
-                objectName: "steeringPlayButton"
-                implicitHeight: 48
-                implicitWidth: 48
+                ToolTip.delay: 500
+                ToolTip.text: checked ? "Click to pause" : "Click to start"
+                ToolTip.visible: hovered
                 checkable: true
                 checked: !!context.enabled
-                onCheckedChanged: context.enabled = checked
-                ToolTip.visible: hovered
-                ToolTip.text: checked ? "Click to pause" : "Click to start"
-                ToolTip.delay: 500
                 font.family: IconFont.name
                 font.pixelSize: 20
+                implicitHeight: 48
+                implicitWidth: 48
+                objectName: "steeringPlayButton"
                 text: checked ? IconFont.iconPause : IconFont.iconPlay
+
+                onCheckedChanged: context.enabled = checked
             }
         }
-
         SpeedSlider {
             id: linearSlider
-            objectName: "steeringLinearSlider"
             Layout.alignment: Qt.AlignHCenter
             Layout.fillHeight: true
             enabled: !!context.enabled
             from: context.linear.min ?? -1.0
-            onFromChanged: context.linear.min = from
+            objectName: "steeringLinearSlider"
             to: context.linear.max ?? 1.0
+
+            onFromChanged: context.linear.min = from
             onToChanged: context.linear.max = to
             onValueChanged: {
                 if (rate.value == 0)
                     publish();
             }
         }
-
         SpeedSlider {
             id: angularSlider
-            objectName: "steeringAngularSlider"
             Layout.fillWidth: true
-            enabled: !!context.enabled
             direction: Qt.Horizontal
+            enabled: !!context.enabled
             from: context.angular.min ?? -1.0
-            onFromChanged: context.angular.min = from
+            objectName: "steeringAngularSlider"
             to: context.angular.max ?? 1.0
+
+            onFromChanged: context.angular.min = from
             onToChanged: context.angular.max = to
             onValueChanged: {
                 if (rate.value == 0)
                     publish();
             }
         }
-
         Button {
-            objectName: "steeringStopButton"
             Layout.fillWidth: true
+            objectName: "steeringStopButton"
             text: "Stop"
+
             onClicked: {
                 linearSlider.value = 0;
                 angularSlider.value = 0;

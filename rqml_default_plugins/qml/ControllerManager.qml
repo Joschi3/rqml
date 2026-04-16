@@ -8,25 +8,26 @@ import "interfaces"
 
 Rectangle {
     id: root
-    anchors.fill: parent
-    property var kddockwidgets_min_size: Qt.size(350, 500)
-    color: palette.base
+    enum State {
+        Unknown,
+        Unconfigured,
+        Inactive,
+        Active,
+        Finalized
+    }
+
     // Test hook: exposes the ControllerManagerInterface so tests can drive
     // transitions without having to synthesize right-clicks on delegates.
     property alias controllerManagerInterface: d.controllerManager
+    property var kddockwidgets_min_size: Qt.size(350, 500)
+
+    anchors.fill: parent
+    color: palette.base
 
     Component.onCompleted: {
         if (context.enabled === undefined)
             context.enabled = true;
         d.refresh();
-    }
-
-    enum State {
-        Unknown = 0,
-        Unconfigured = 1,
-        Inactive = 2,
-        Active = 3,
-        Finalized = 4
     }
 
     GridLayout {
@@ -37,12 +38,11 @@ Rectangle {
         Label {
             text: "Controller Manager"
         }
-
         ComboBox {
             id: controllerManagerComboBox
-            objectName: "cmComboBox"
             Layout.fillWidth: true
             model: d.controllerManagers
+            objectName: "cmComboBox"
 
             onCurrentValueChanged: {
                 if (!currentValue || currentValue === context.controller_manager_namespace)
@@ -50,35 +50,34 @@ Rectangle {
                 context.controller_manager_namespace = currentValue;
             }
         }
-
         RefreshButton {
             objectName: "cmRefreshButton"
+
             onClicked: {
                 animate = true;
                 d.refresh();
                 animate = false;
             }
         }
-
         LoadingListView {
             id: controllerListView
-            objectName: "cmControllerList"
             Layout.columnSpan: 3
+            Layout.fillHeight: true
             Layout.fillWidth: true
             Layout.preferredHeight: 240
-            Layout.fillHeight: true
+            headerPositioning: ListView.OverlayHeader
             isLoading: d.controllerManager.loading
             model: d.controllerManager.controllers
+            objectName: "cmControllerList"
             spacing: 8
-            header: ListHeader {
-                text: "Controllers"
-            }
-            headerPositioning: ListView.OverlayHeader
 
-            delegate: MouseArea { // With Qt 6.9 ContextMenu could be used, but not available before
-                width: controllerListView.width
-                height: 48
+            delegate: MouseArea {
+                property var controller: model
+
                 acceptedButtons: Qt.LeftButton | Qt.RightButton
+                height: 48 // With Qt 6.9 ContextMenu could be used, but not available before
+                width: controllerListView.width
+
                 onClicked: mouse => {
                     if (mouse.button === Qt.RightButton) {
                         contextMenu.popup();
@@ -89,7 +88,6 @@ Rectangle {
                         contextMenu.popup();
                     }
                 }
-                property var controller: model
 
                 Menu {
                     id: contextMenu
@@ -103,79 +101,82 @@ Rectangle {
                         }
                         return result + padding * 2;
                     }
+
                     Instantiator {
                         model: d.getTransitionsForControllerState(controller.state)
 
                         delegate: MenuItem {
                             text: modelData.name
+
                             onTriggered: {
                                 d.controllerManager.transitionController(controller.name, modelData.actions);
                             }
                         }
+
                         onObjectAdded: (index, object) => contextMenu.insertItem(index, object)
                         onObjectRemoved: (index, object) => contextMenu.removeItem(object)
                     }
-                    MenuSeparator {}
+                    MenuSeparator {
+                    }
                     Action {
                         text: qsTr("Show Info")
+
                         onTriggered: {
                             controllerInfoDialog.openControllerInfo(controller);
                         }
                     }
                 }
-
                 RowLayout {
                     anchors.fill: parent
                     anchors.rightMargin: controllerListView.ScrollBar.vertical.visible ? controllerListView.ScrollBar.vertical.width : 0
 
                     StateIndicator {
-                        Layout.margins: 4
                         Layout.alignment: Qt.AlignVCenter
+                        Layout.margins: 4
                         state: model.state
                     }
-
                     Label {
                         Layout.fillWidth: true
                         text: model.name
                     }
-
                     Label {
                         Layout.margins: 8
                         text: model.state
                     }
-
                     Button {
                         Layout.margins: 4
-                        implicitWidth: 40
                         implicitHeight: parent.height - 8
+                        implicitWidth: 40
                         text: "..."
+
                         onClicked: contextMenu.popup()
                     }
                 }
             }
+            header: ListHeader {
+                text: "Controllers"
+            }
         }
-
         LoadingListView {
             id: hardwareComponentsListView
-            objectName: "cmHardwareList"
             Layout.columnSpan: 3
-            Layout.preferredHeight: 120
-            Layout.fillWidth: true
             Layout.fillHeight: true
+            Layout.fillWidth: true
+            Layout.preferredHeight: 120
             Layout.topMargin: 8
+            headerPositioning: ListView.OverlayHeader
             isLoading: d.controllerManager.loading
             model: d.controllerManager.hardwareComponents
+            objectName: "cmHardwareList"
             spacing: 8
-            header: ListHeader {
-                text: "Hardware Components"
-                z: 2
-            }
-            headerPositioning: ListView.OverlayHeader
 
-            delegate: MouseArea { // With Qt 6.9 ContextMenu could be used, but not available before
-                width: hardwareComponentsListView.width
-                height: 48
+            delegate: MouseArea {
+                property var hardwareComponent: model
+
                 acceptedButtons: Qt.LeftButton | Qt.RightButton
+                height: 48 // With Qt 6.9 ContextMenu could be used, but not available before
+                width: hardwareComponentsListView.width
+
                 onClicked: mouse => {
                     if (mouse.button === Qt.RightButton) {
                         contextMenu.popup();
@@ -186,7 +187,6 @@ Rectangle {
                         contextMenu.popup();
                     }
                 }
-                property var hardwareComponent: model
 
                 Menu {
                     id: contextMenu
@@ -200,80 +200,163 @@ Rectangle {
                         }
                         return result + padding * 2;
                     }
+
                     Instantiator {
                         model: d.getTransitionsForHardwareComponentState(hardwareComponent.state.label)
 
                         delegate: MenuItem {
                             text: modelData.name
+
                             onTriggered: {
                                 d.controllerManager.transitionHardwareComponent(hardwareComponent.name, modelData.target_state);
                             }
                         }
+
                         onObjectAdded: (index, object) => contextMenu.insertItem(index, object)
                         onObjectRemoved: (index, object) => contextMenu.removeItem(object)
                     }
-                    MenuSeparator {}
+                    MenuSeparator {
+                    }
                     Action {
                         text: qsTr("Show Info")
+
                         onTriggered: {
                             hardwareComponentInfoDialog.openHardwareComponentInfo(hardwareComponent);
                         }
                     }
                 }
-
                 RowLayout {
                     anchors.fill: parent
                     anchors.rightMargin: hardwareComponentsListView.ScrollBar.vertical.visible ? hardwareComponentsListView.ScrollBar.vertical.width : 0
 
                     StateIndicator {
-                        Layout.margins: 4
                         Layout.alignment: Qt.AlignVCenter
+                        Layout.margins: 4
                         state: model.state.label
                     }
                     Label {
                         Layout.fillWidth: true
                         text: model.name
                     }
-
                     Label {
                         Layout.margins: 8
                         text: model.state.label
                     }
-
                     Button {
                         Layout.margins: 4
-                        implicitWidth: 40
                         implicitHeight: parent.height - 8
+                        implicitWidth: 40
                         text: "..."
+
                         onClicked: contextMenu.popup()
                     }
                 }
             }
+            header: ListHeader {
+                text: "Hardware Components"
+                z: 2
+            }
         }
     }
-
     ControllerInfoDialog {
         id: controllerInfoDialog
         objectName: "cmControllerInfoDialog"
     }
-
-
     HardwareComponentInfoDialog {
         id: hardwareComponentInfoDialog
         objectName: "cmHardwareComponentInfoDialog"
     }
-
     QtObject {
         id: d
-        property var controllerManagers: []
-        property var trajectoryClient: null
+
         property var controllerManager: ControllerManagerInterface {
             controllerManager: context.controller_manager_namespace || ""
         }
+        property var controllerManagers: []
+        property var trajectoryClient: null
 
+        function getTransitionsForControllerState(state) {
+            const transitions = {
+                "active": [{
+                        "name": "Deactivate (inactive)",
+                        "actions": ["deactivate"]
+                    }, {
+                        "name": "Deactivate and Unload (unloaded)",
+                        "actions": ["deactivate", "unload"]
+                    }],
+                "inactive": [{
+                        "name": "Activate (active)",
+                        "actions": ["activate"]
+                    }, {
+                        "name": "Unload and Load (unconfigured)",
+                        "actions": ["unload", "load"]
+                    }, {
+                        "name": "Unload (unloaded)",
+                        "actions": ["unload"]
+                    }],
+                "unconfigured": [{
+                        "name": "Configure and Activate (active)",
+                        "actions": ["configure", "activate"]
+                    }, {
+                        "name": "Configure (inactive)",
+                        "actions": ["configure"]
+                    }, {
+                        "name": "Unload (unloaded)",
+                        "actions": ["unload"]
+                    }],
+                "unloaded": [{
+                        "name": "Load (unconfigured)",
+                        "actions": ["load"]
+                    }]
+            };
+            return transitions[state] || [];
+        }
+        function getTransitionsForHardwareComponentState(state) {
+            const transitions = {
+                "active": [{
+                        "name": "Deactivate (inactive)",
+                        "target_state": {
+                            "id": State.Inactive,
+                            "label": "inactive"
+                        }
+                    }, {
+                        "name": "Deactivate and Cleanup (unconfigured)",
+                        "target_state": {
+                            "id": State.Unconfigured,
+                            "label": "unconfigured"
+                        }
+                    },],
+                "inactive": [{
+                        "name": "Activate (active)",
+                        "target_state": {
+                            "id": State.Active,
+                            "label": "active"
+                        }
+                    }, {
+                        "name": "Cleanup (unconfigured)",
+                        "target_state": {
+                            "id": State.Unconfigured,
+                            "label": "unconfigured"
+                        }
+                    },],
+                "unconfigured": [{
+                        "name": "Configure and Activate (active)",
+                        "target_state": {
+                            "id": State.Active,
+                            "label": "active"
+                        }
+                    }, {
+                        "name": "Configure (inactive)",
+                        "target_state": {
+                            "id": State.Inactive,
+                            "label": "inactive"
+                        }
+                    },]
+            };
+            return transitions[state] || [];
+        }
         function refresh() {
             const prevControllerManager = context.controller_manager_namespace;
-
             const services = Ros2.queryServices("controller_manager_msgs/srv/ListControllers");
             let controllerManagers = prevControllerManager ? [prevControllerManager] : [];
             for (let i = 0; i < services.length; i++) {
@@ -286,121 +369,16 @@ Rectangle {
             }
             // Remove empty entries
             controllerManagers = controllerManagers.filter(function (e) {
-                return e;
-            });
+                    return e;
+                });
             controllerManagers.sort();
             d.controllerManagers = [];
             d.controllerManagers = controllerManagers;
-
             if (prevControllerManager) {
                 const index = d.controllerManagers.indexOf(prevControllerManager);
                 controllerManagerComboBox.currentIndex = Math.max(0, index);
                 d.controllerManager.refresh();
             }
-        }
-
-        function getTransitionsForControllerState(state) {
-            const transitions = {
-                "active": [
-                    {
-                        name: "Deactivate (inactive)",
-                        actions: ["deactivate"]
-                    },
-                    {
-                        name: "Deactivate and Unload (unloaded)",
-                        actions: ["deactivate", "unload"]
-                    }
-                ],
-                "inactive": [
-                    {
-                        name: "Activate (active)",
-                        actions: ["activate"]
-                    },
-                    {
-                        name: "Unload and Load (unconfigured)",
-                        actions: ["unload", "load"]
-                    },
-                    {
-                        name: "Unload (unloaded)",
-                        actions: ["unload"]
-                    }
-                ],
-                "unconfigured": [
-                    {
-                        name: "Configure and Activate (active)",
-                        actions: ["configure", "activate"]
-                    },
-                    {
-                        name: "Configure (inactive)",
-                        actions: ["configure"]
-                    },
-                    {
-                        name: "Unload (unloaded)",
-                        actions: ["unload"]
-                    }
-                ],
-                "unloaded": [
-                    {
-                        name: "Load (unconfigured)",
-                        actions: ["load"]
-                    }
-                ]
-            };
-            return transitions[state] || [];
-        }
-
-        function getTransitionsForHardwareComponentState(state) {
-            const transitions = {
-                "active": [
-                    {
-                        name: "Deactivate (inactive)",
-                        target_state: {
-                            id: State.Inactive,
-                            label: "inactive"
-                        }
-                    },
-                    {
-                        name: "Deactivate and Cleanup (unconfigured)",
-                        target_state: {
-                            id: State.Unconfigured,
-                            label: "unconfigured"
-                        }
-                    },
-                ],
-                "inactive": [
-                    {
-                        name: "Activate (active)",
-                        target_state: {
-                            id: State.Active,
-                            label: "active"
-                        }
-                    },
-                    {
-                        name: "Cleanup (unconfigured)",
-                        target_state: {
-                            id: State.Unconfigured,
-                            label: "unconfigured"
-                        }
-                    },
-                ],
-                "unconfigured": [
-                    {
-                        name: "Configure and Activate (active)",
-                        target_state: {
-                            id: State.Active,
-                            label: "active"
-                        }
-                    },
-                    {
-                        name: "Configure (inactive)",
-                        target_state: {
-                            id: State.Inactive,
-                            label: "inactive"
-                        }
-                    },
-                ]
-            };
-            return transitions[state] || [];
         }
     }
 }

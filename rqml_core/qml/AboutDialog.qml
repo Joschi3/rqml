@@ -14,42 +14,47 @@
  *  You should have received a copy of the GNU General Public License
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 
 Dialog {
-  id: aboutDialog
-  title: qsTr("About RQml")
-  modal: true
-  visible: false
-  standardButtons: Dialog.Ok
-  anchors.centerIn: parent
-  padding: 20
+    id: aboutDialog
+    anchors.centerIn: parent
+    modal: true
+    padding: 20
+    standardButtons: Dialog.Ok
+    title: qsTr("About RQml")
+    visible: false
 
-  ColumnLayout {
-    Label {
-      text: qsTr("RQml is a Qt/QML based GUI for ROS2.")
-      wrapMode: Text.Wrap
-    }
+    ColumnLayout {
+        Label {
+            text: qsTr("RQml is a Qt/QML based GUI for ROS2.")
+            wrapMode: Text.Wrap
+        }
+        Label {
+            text: qsTr("Qt version: %1").arg(QtVersion)
+        }
+        Label {
+            text: qsTr("Version: %1").arg("1.2025.120")
+            wrapMode: Text.Wrap
+        }
+        Label {
+            text: qsTr("Author: Stefan Fabian")
+            wrapMode: Text.Wrap
+        }
+        Label {
+            text: qsTr("License: GPLv3")
+            wrapMode: Text.Wrap
+        }
+        Label {
+            text: qsTr("This is free software but donations are welcome :)")
+            wrapMode: Text.Wrap
+        }
+        Label {
+            text: "<a href='https://github.com/StefanFabian/rqml'>GitHub</a>"
 
-    Label {
-      text: qsTr("Qt version: %1").arg(QtVersion)
+            onLinkActivated: link => Qt.openUrlExternally(link)
+        }
     }
-
-    Label {
-      text: qsTr("Version: %1").arg("1.2025.120")
-      wrapMode: Text.Wrap
-    }
-
-    Label {
-      text: qsTr("Author: Stefan Fabian")
-      wrapMode: Text.Wrap
-    }
-    Label {
-      text: qsTr("License: GPLv3")
-      wrapMode: Text.Wrap
-    }
-  }
 }

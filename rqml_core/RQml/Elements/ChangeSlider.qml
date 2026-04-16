@@ -14,52 +14,51 @@
  *  You should have received a copy of the GNU General Public License
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 
 Slider {
     id: control
+
     property real currentValue: 0
     property real currentValueVisualPosition: {
         const percent = Math.min(1, Math.max(0, (currentValue - from) / (to - from)));
         return LayoutMirroring.enabled ? 1 - percent : percent;
     }
+
     stepSize: (to - from) / 1000
 
     background: Rectangle {
+        clip: true
+        color: "#bdbebf"
+        height: implicitHeight
+        implicitHeight: 8
+        implicitWidth: 200
+        radius: 4
+        width: control.availableWidth
         x: control.leftPadding
         y: control.topPadding + control.availableHeight / 2 - height / 2
-        implicitWidth: 200
-        implicitHeight: 8
-        width: control.availableWidth
-        height: implicitHeight
-        radius: 4
-        color: "#bdbebf"
-        clip: true
 
         Rectangle {
-            width: Math.max(control.visualPosition, control.currentValueVisualPosition) * parent.width
-            height: parent.height
             color: "#4cce54"
-            radius: parent.radius
-        }
-
-        Rectangle {
-            width: Math.min(control.visualPosition, control.currentValueVisualPosition) * parent.width
             height: parent.height
-            color: "#35833a"
             radius: parent.radius
+            width: Math.max(control.visualPosition, control.currentValueVisualPosition) * parent.width
+        }
+        Rectangle {
+            color: "#35833a"
+            height: parent.height
+            radius: parent.radius
+            width: Math.min(control.visualPosition, control.currentValueVisualPosition) * parent.width
         }
     }
-
     handle: Rectangle {
+        color: control.pressed ? "#15b3af" : "#21be2b"
+        implicitHeight: 26
+        implicitWidth: 8
+        radius: 4
         x: control.leftPadding + control.visualPosition * (control.availableWidth - width)
         y: control.topPadding + control.availableHeight / 2 - height / 2
-        implicitWidth: 8
-        implicitHeight: 26
-        radius: 4
-        color: control.pressed ? "#15b3af" : "#21be2b"
     }
 }

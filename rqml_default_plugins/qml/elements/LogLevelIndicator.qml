@@ -4,24 +4,7 @@ import RQml.Fonts
 
 Text {
     required property int level
-    horizontalAlignment: Text.AlignHCenter
-    verticalAlignment: Text.AlignVCenter
-    text: {
-        switch (parseInt(level)) {
-        case 10:
-            return IconFont.iconDebug;
-        case 20:
-            return IconFont.iconInfo;
-        case 30:
-            return IconFont.iconWarning;
-        case 40:
-            return IconFont.iconError;
-        case 50:
-            return IconFont.iconFatal;
-        default:
-            return "";
-        }
-    }
+
     color: {
         switch (parseInt(level)) {
         case 10:
@@ -40,12 +23,27 @@ Text {
     }
     font.family: IconFont.name
     font.pixelSize: 18
+    horizontalAlignment: Text.AlignHCenter
+    text: {
+        switch (parseInt(level)) {
+        case 10:
+            return IconFont.iconDebug;
+        case 20:
+            return IconFont.iconInfo;
+        case 30:
+            return IconFont.iconWarning;
+        case 40:
+            return IconFont.iconError;
+        case 50:
+            return IconFont.iconFatal;
+        default:
+            return "";
+        }
+    }
+    verticalAlignment: Text.AlignVCenter
 
     MouseArea {
-        anchors.fill: parent
-        hoverEnabled: true
-        acceptedButtons: Qt.NoButton
-        ToolTip.visible: containsMouse || pressed
+        ToolTip.delay: 500
         ToolTip.text: {
             switch (parseInt(level)) {
             case 10:
@@ -62,6 +60,9 @@ Text {
                 return "Unknown log level";
             }
         }
-        ToolTip.delay: 500
+        ToolTip.visible: containsMouse || pressed
+        acceptedButtons: Qt.NoButton
+        anchors.fill: parent
+        hoverEnabled: true
     }
 }

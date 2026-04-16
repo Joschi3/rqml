@@ -14,21 +14,19 @@
  *  You should have received a copy of the GNU General Public License
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-
 import QtQuick
 import QtQuick.Controls
 
 TextField {
-    selectByMouse: true
     property var from: null
     property var to: null
     property var value: 0
+
+    selectByMouse: true
     text: Number(value).toFixed(0)
 
-    onValueChanged: {
-        let formatted = Number(value).toFixed(0);
-        if (text !== formatted)
-            text = formatted;
+    validator: RegularExpressionValidator {
+        regularExpression: /^-?[0-9]*$/
     }
 
     onEditingFinished: {
@@ -46,17 +44,18 @@ TextField {
         } else if (to !== null && to !== undefined && newValue > to) {
             newValue = to;
         }
-
         if (newValue === value) {
             // Re-sync text even if value didn't change (e.g., input was "007" for value 7)
             let formatted = Number(value).toFixed(0);
-            if (text !== formatted) text = formatted;
+            if (text !== formatted)
+                text = formatted;
             return;
         }
         value = newValue;
     }
-
-    validator: RegularExpressionValidator {
-        regularExpression: /^-?[0-9]*$/
+    onValueChanged: {
+        let formatted = Number(value).toFixed(0);
+        if (text !== formatted)
+            text = formatted;
     }
 }

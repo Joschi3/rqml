@@ -14,72 +14,72 @@
  *  You should have received a copy of the GNU General Public License
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 import RQml.Elements
 
 Dialog {
-    title: qsTr("Settings")
-    modal: true
-    visible: false
-    standardButtons: Dialog.Ok
     anchors.centerIn: parent
-    width: Math.min(mainWindow.width * 0.8, 400)
-
+    modal: true
     padding: 20
+    standardButtons: Dialog.Ok
+    title: qsTr("Settings")
+    visible: false
+    width: Math.min(mainWindow.width * 0.8, 400)
 
     GridLayout {
         anchors.fill: parent
         columns: 2
 
         Label {
-            Layout.fillWidth: true
             Layout.columnSpan: 2
-            text: qsTr("Configuration Directories")
+            Layout.fillWidth: true
             font.bold: true
+            text: qsTr("Configuration Directories")
         }
-
         Rectangle {
             Layout.columnSpan: 2
             Layout.fillWidth: true
-            height: 216
             color: "#22aaaaaa"
+            height: 216
 
             ListView {
                 anchors.fill: parent
                 anchors.margins: 8
-                model: RQml.configDirectories
                 clip: true
+                model: RQml.configDirectories
+
                 delegate: RowLayout {
                     width: parent.width
+
                     TruncatedLabel {
-                        Layout.fillWidth: true
                         Layout.alignment: Qt.AlignVCenter
+                        Layout.fillWidth: true
                         text: modelData
                     }
                     Button {
                         id: removeButton
-                        text: qsTr("Remove")
-                        onClicked: RQml.removeConfigDirectory(modelData)
                         enabled: RQml.configDirectories.length > 1
+                        text: qsTr("Remove")
+
+                        onClicked: RQml.removeConfigDirectory(modelData)
                     }
                 }
             }
         }
-
         Button {
             Layout.alignment: Qt.AlignRight
             Layout.columnSpan: 2
             text: qsTr("Add")
+
             onClicked: {
                 let dirDialog = Qt.createQmlObject('import QtQuick.Dialogs; FolderDialog { title: "Select Configuration Directory"; }', parent);
                 dirDialog.onAccepted.connect(function () {
-                    if (!dirDialog.selectedFolder)
-                        return;
-                    RQml.addConfigDirectory(dirDialog.selectedFolder);
-                });
+                        if (!dirDialog.selectedFolder)
+                            return;
+                        RQml.addConfigDirectory(dirDialog.selectedFolder);
+                    });
                 dirDialog.open();
             }
         }

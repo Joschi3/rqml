@@ -14,14 +14,15 @@
  *  You should have received a copy of the GNU General Public License
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-
 import QtQuick
 
 QtObject {
     id: root
-    default property alias children: root.__children
+
     // Needs one dummy child to allow appending to the children list
     property list<QtObject> __children: [
-        QtObject {}
+        QtObject {
+        }
     ]
+    default property alias children: root.__children
 }

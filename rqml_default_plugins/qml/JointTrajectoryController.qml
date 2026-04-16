@@ -7,8 +7,10 @@ import "interfaces"
 
 Rectangle {
     id: root
-    anchors.fill: parent
+
     property var kddockwidgets_min_size: Qt.size(480, 360)
+
+    anchors.fill: parent
     color: palette.base
 
     Component.onCompleted: {
@@ -26,6 +28,7 @@ Rectangle {
 
     QtObject {
         id: d
+
         property var controllerManagers: []
         property var trajectoryController: JointTrajectoryControllerInterface {
             controllerManager: context.controller_manager_namespace || ""
@@ -35,7 +38,6 @@ Rectangle {
 
         function refresh() {
             const prevControllerManager = context.controller_manager_namespace;
-
             const services = Ros2.queryServices("controller_manager_msgs/srv/ListControllers");
             let controllerManagers = prevControllerManager ? [prevControllerManager] : [];
             for (let i = 0; i < services.length; i++) {
@@ -48,12 +50,11 @@ Rectangle {
             }
             // Remove empty entries
             controllerManagers = controllerManagers.filter(function (e) {
-                return e;
-            });
+                    return e;
+                });
             controllerManagers.sort();
             d.controllerManagers = [];
             d.controllerManagers = controllerManagers;
-
             if (prevControllerManager) {
                 const index = d.controllerManagers.indexOf(prevControllerManager);
                 namespaceCombobox.currentIndex = Math.max(0, index);
@@ -61,12 +62,11 @@ Rectangle {
             }
         }
     }
-
     GridLayout {
         anchors.fill: parent
         anchors.margins: 4
-
         columns: 3
+
         Label {
             text: "Controller Manager Namespace"
         }
@@ -74,12 +74,11 @@ Rectangle {
             Layout.columnSpan: 2
             text: "Controller"
         }
-
         ComboBox {
             id: namespaceCombobox
-            objectName: "jtcNamespaceComboBox"
             Layout.fillWidth: true
             model: d.controllerManagers
+            objectName: "jtcNamespaceComboBox"
 
             onCurrentValueChanged: {
                 if (!currentValue)
@@ -87,14 +86,9 @@ Rectangle {
                 context.controller_manager_namespace = currentValue;
             }
         }
-
         ComboBox {
             id: controllerComboBox
-            objectName: "jtcControllerComboBox"
             Layout.fillWidth: true
-            model: d.trajectoryController.controllers
-            textRole: "name"
-
             currentIndex: {
                 for (let i = 0; i < d.trajectoryController.controllers.count; i++) {
                     let c = d.trajectoryController.controllers.get(i);
@@ -103,6 +97,9 @@ Rectangle {
                 }
                 return -1;
             }
+            model: d.trajectoryController.controllers
+            objectName: "jtcControllerComboBox"
+            textRole: "name"
 
             onCurrentTextChanged: {
                 if (!currentText)
@@ -110,57 +107,58 @@ Rectangle {
                 context.controller = currentText;
             }
         }
-
         RefreshButton {
             objectName: "jtcRefreshButton"
+
             onClicked: {
                 animate = true;
                 d.trajectoryController.refresh();
                 animate = false;
             }
         }
-
         Switch {
             id: shortestPathSwitch
-            objectName: "jtcShortestPathSwitch"
             Layout.columnSpan: 3
-            text: "Use shortest path duration for continuous joints"
             checked: context.take_shortest_path || false
+            objectName: "jtcShortestPathSwitch"
+            text: "Use shortest path duration for continuous joints"
+
             onCheckedChanged: context.take_shortest_path = checked
         }
-
         ListView {
             id: jointListView
-            objectName: "jtcJointListView"
             Layout.columnSpan: 3
-            Layout.fillWidth: true
             Layout.fillHeight: true
-            spacing: 4
+            Layout.fillWidth: true
             clip: true
             model: d.trajectoryController.joints
+            objectName: "jtcJointListView"
+            spacing: 4
 
             ScrollBar.vertical: ScrollBar {
                 policy: jointListView.contentHeight > jointListView.height ? ScrollBar.AlwaysOn : ScrollBar.AlwaysOff
             }
-
             delegate: RowLayout {
-                x: 8
-                width: parent.width - 16
+                property var slider: positionSlider
+
                 height: model.active ? 48 : 0
                 spacing: 4
-                property var slider: positionSlider
                 visible: model.active || false
+                width: parent.width - 16
+                x: 8
+
                 Label {
                     text: model.name
                 }
                 ChangeSlider {
                     id: positionSlider
                     Layout.fillWidth: true
-                    stepSize: 0.01
+                    currentValue: model.position
                     from: model.limits.lower
+                    stepSize: 0.01
                     to: model.limits.upper
                     value: model.goal
-                    currentValue: model.position
+
                     onMoved: {
                         model.goal = Math.round(value * 100) / 100;
                     }
@@ -170,10 +168,12 @@ Rectangle {
                     implicitWidth: 60
                     selectByMouse: true
                     text: model.goal
+
                     validator: DoubleValidator {
                         bottom: model.limits.lower
                         top: model.limits.upper
                     }
+
                     onTextChanged: {
                         let value = parseFloat(text);
                         if (isNaN(value) || value == null)
@@ -187,47 +187,51 @@ Rectangle {
                 }
             }
         }
-
         ColumnLayout {
-            Layout.fillWidth: true
             Layout.columnSpan: 3
+            Layout.fillWidth: true
             visible: !!controllerComboBox.currentText && jointListView.count > 0 || false
 
             RowLayout {
                 Layout.fillWidth: true
+
                 Slider {
                     id: speedSlider
-                    objectName: "jtcSpeedSlider"
-                    Layout.fillWidth: true
+
                     property real speed: value
+
+                    Layout.fillWidth: true
                     from: 0.01
+                    objectName: "jtcSpeedSlider"
                     to: 3
                     value: context.speed || 0.5
+
                     onValueChanged: context.speed = value
                 }
                 Label {
                     text: speedSlider.speed.toFixed(2) + " rad/s"
                 }
             }
-
             RowLayout {
                 Layout.fillWidth: true
-                Button {
-                    id: resetButton
-                    objectName: "jtcResetButton"
-                    Layout.fillWidth: true
-                    Layout.margins: 8
-                    text: "Reset"
-                    onClicked: d.trajectoryController.resetGoals()
-                }
 
                 Button {
-                    id: sendButton
-                    objectName: "jtcSendButton"
+                    id: resetButton
                     Layout.fillWidth: true
                     Layout.margins: 8
-                    text: d.trajectoryController.isGoalActive ? "Cancel" : "Send"
+                    objectName: "jtcResetButton"
+                    text: "Reset"
+
+                    onClicked: d.trajectoryController.resetGoals()
+                }
+                Button {
+                    id: sendButton
+                    Layout.fillWidth: true
+                    Layout.margins: 8
                     enabled: d.trajectoryController.controllerReady
+                    objectName: "jtcSendButton"
+                    text: d.trajectoryController.isGoalActive ? "Cancel" : "Send"
+
                     onClicked: {
                         if (d.trajectoryController.isGoalActive) {
                             d.trajectoryController.cancelGoals();
@@ -238,7 +242,6 @@ Rectangle {
                 }
             }
         }
-
         Label {
             text: "Robot Description: " + (d.trajectoryController.hasRobotDescription ? "Loaded" : "Waiting...")
         }

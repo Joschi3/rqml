@@ -14,7 +14,6 @@
  *  You should have received a copy of the GNU General Public License
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-
 import QtQml.Models
 import QtQuick
 import QtQuick.Controls
@@ -22,14 +21,6 @@ import QtQuick.Layouts
 
 Dialog {
     id: root
-    x: (parent.width - width) / 2
-    y: 0
-    focus: true
-    standardButtons: Dialog.NoButton
-    padding: 12
-    width: Math.min(mainWindow.width * 0.8, 640)
-    height: Math.min(mainWindow.height * 0.6, 480)
-    title: recent ? qsTr("Recent Configurations") : qsTr("Configurations")
 
     property bool recent: false
 
@@ -42,28 +33,17 @@ Dialog {
         filterInput.forceActiveFocus();
     }
 
+    focus: true
+    height: Math.min(mainWindow.height * 0.6, 480)
+    padding: 12
+    standardButtons: Dialog.NoButton
+    title: recent ? qsTr("Recent Configurations") : qsTr("Configurations")
+    width: Math.min(mainWindow.width * 0.8, 640)
+    x: (parent.width - width) / 2
+    y: 0
+
     QtObject {
         id: d
-
-        function updateFilteredModel() {
-            filteredModel.clear();
-            const q = filterInput.text.trim().toLowerCase();
-            let input = recent ? RQml.recentConfigs : RQml.configs;
-            input = input || [];
-            input.forEach(cfg => {
-                const name = cfg.path.split("/").pop().split(".").slice(0, -1).join(".");
-                const path = cfg.path;
-                if (!q || name.toLowerCase().indexOf(q) !== -1 || path.toLowerCase().indexOf(q) !== -1) {
-                    filteredModel.append({
-                        "name": name,
-                        "path": path
-                    });
-                }
-            });
-            // clamp selection within bounds
-            configsList.currentIndex = Math.min(Math.max(0, filteredModel.count > 0 ? 0 : -1), filteredModel.count - 1);
-        }
-
         function loadSelected() {
             if (configsList.currentIndex >= 0 && configsList.currentIndex < filteredModel.count) {
                 const item = filteredModel.get(configsList.currentIndex);
@@ -73,12 +53,28 @@ Dialog {
                 }
             }
         }
+        function updateFilteredModel() {
+            filteredModel.clear();
+            const q = filterInput.text.trim().toLowerCase();
+            let input = recent ? RQml.recentConfigs : RQml.configs;
+            input = input || [];
+            input.forEach(cfg => {
+                    const name = cfg.path.split("/").pop().split(".").slice(0, -1).join(".");
+                    const path = cfg.path;
+                    if (!q || name.toLowerCase().indexOf(q) !== -1 || path.toLowerCase().indexOf(q) !== -1) {
+                        filteredModel.append({
+                                "name": name,
+                                "path": path
+                            });
+                    }
+                });
+            // clamp selection within bounds
+            configsList.currentIndex = Math.min(Math.max(0, filteredModel.count > 0 ? 0 : -1), filteredModel.count - 1);
+        }
     }
-
     ListModel {
         id: filteredModel
     }
-
     ColumnLayout {
         anchors.fill: parent
         spacing: 8
@@ -86,9 +82,9 @@ Dialog {
         TextField {
             id: filterInput
             Layout.fillWidth: true
-            placeholderText: qsTr("Type to filter configs…")
             focus: true
-            onTextChanged: d.updateFilteredModel()
+            placeholderText: qsTr("Type to filter configs…")
+
             Keys.onPressed: event => {
                 if (event.key === Qt.Key_Down) {
                     configsList.moveDown();
@@ -104,59 +100,16 @@ Dialog {
                     event.accepted = true;
                 }
             }
+            onTextChanged: d.updateFilteredModel()
         }
-
         ListView {
             id: configsList
-            Layout.fillWidth: true
-            Layout.fillHeight: true
-            clip: true
-            model: filteredModel
-            delegate: ItemDelegate {
-                width: configsList.width
-                text: (model.name || model.path)
-                highlighted: index === configsList.currentIndex
-                onClicked: {
-                    configsList.currentIndex = index;
-                    d.loadSelected();
-                }
-                contentItem: Column {
-                    x: 8
-                    width: parent.width - 16
-                    spacing: 2
-                    Label {
-                        Layout.topMargin: 4
-                        width: parent.width
-                        text: model.name || model.path
-                        font.bold: true
-                        elide: Text.ElideRight
-                    }
-                    Label {
-                        Layout.bottomMargin: 4
-                        width: parent.width
-                        text: model.path
-                        font.pixelSize: Math.round(Qt.application.font.pixelSize * 0.9)
-                        opacity: 0.7
-                        elide: Text.ElideMiddle
-                    }
-                }
+            function moveDown() {
+                let newCurrentIndex = currentIndex + 1;
+                if (newCurrentIndex >= model.count)
+                    newCurrentIndex = 0;
+                currentIndex = newCurrentIndex;
             }
-            Keys.onPressed: event => {
-                if (event.key === Qt.Key_Down) {
-                    configsList.moveDown();
-                    event.accepted = true;
-                } else if (event.key === Qt.Key_Up) {
-                    configsList.moveUp();
-                    event.accepted = true;
-                } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
-                    d.loadSelected();
-                    event.accepted = true;
-                } else if (event.key === Qt.Key_Escape) {
-                    root.close();
-                    event.accepted = true;
-                }
-            }
-
             function moveUp() {
                 let newCurrentIndex = currentIndex - 1;
                 if (newCurrentIndex < 0)
@@ -164,11 +117,58 @@ Dialog {
                 currentIndex = newCurrentIndex;
             }
 
-            function moveDown() {
-                let newCurrentIndex = currentIndex + 1;
-                if (newCurrentIndex >= model.count)
-                    newCurrentIndex = 0;
-                currentIndex = newCurrentIndex;
+            Layout.fillHeight: true
+            Layout.fillWidth: true
+            clip: true
+            model: filteredModel
+
+            delegate: ItemDelegate {
+                highlighted: index === configsList.currentIndex
+                text: (model.name || model.path)
+                width: configsList.width
+
+                contentItem: Column {
+                    spacing: 2
+                    width: parent.width - 16
+                    x: 8
+
+                    Label {
+                        Layout.topMargin: 4
+                        elide: Text.ElideRight
+                        font.bold: true
+                        text: model.name || model.path
+                        width: parent.width
+                    }
+                    Label {
+                        Layout.bottomMargin: 4
+                        elide: Text.ElideMiddle
+                        font.pixelSize: Math.round(Qt.application.font.pixelSize * 0.9)
+                        opacity: 0.7
+                        text: model.path
+                        width: parent.width
+                    }
+                }
+
+                onClicked: {
+                    configsList.currentIndex = index;
+                    d.loadSelected();
+                }
+            }
+
+            Keys.onPressed: event => {
+                if (event.key === Qt.Key_Down) {
+                    configsList.moveDown();
+                    event.accepted = true;
+                } else if (event.key === Qt.Key_Up) {
+                    configsList.moveUp();
+                    event.accepted = true;
+                } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+                    d.loadSelected();
+                    event.accepted = true;
+                } else if (event.key === Qt.Key_Escape) {
+                    root.close();
+                    event.accepted = true;
+                }
             }
         }
     }

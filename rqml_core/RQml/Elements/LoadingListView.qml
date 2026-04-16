@@ -14,23 +14,25 @@
  *  You should have received a copy of the GNU General Public License
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 
 ListView {
     id: control
+
     property bool isLoading: false
+
     clip: true
+
     ScrollBar.vertical: ScrollBar {
         policy: control.contentHeight > control.height ? ScrollBar.AlwaysOn : ScrollBar.AlwaysOff
     }
 
     Rectangle {
-        visible: control.isLoading
         anchors.fill: parent
         color: "#88ffffff"
+        visible: control.isLoading
         z: 1
 
         BusyIndicator {

@@ -6,8 +6,10 @@ import RQml.Elements
 
 Rectangle {
     id: root
-    anchors.fill: parent
+
     property var kddockwidgets_min_size: Qt.size(350, 500)
+
+    anchors.fill: parent
     color: palette.base
 
     ColumnLayout {
@@ -17,18 +19,9 @@ Rectangle {
         GridLayout {
             Layout.fillWidth: true
             columns: 2
+
             FuzzySelector {
                 id: topicSelect
-                objectName: "actionTopicSelector"
-                Layout.fillWidth: true
-                placeholderText: qsTr("Action Topic")
-                text: context.topic ?? ""
-                onTextChanged: {
-                    if (text === context.topic)
-                        return;
-                    context.topic = text;
-                    typeSelect.refresh();
-                }
                 function refresh() {
                     let result = Ros2.queryActions();
                     if (!!context.topic) {
@@ -39,33 +32,31 @@ Rectangle {
                     }
                     model = result;
                 }
+
+                Layout.fillWidth: true
+                objectName: "actionTopicSelector"
+                placeholderText: qsTr("Action Topic")
+                text: context.topic ?? ""
+
                 Component.onCompleted: refresh()
+                onTextChanged: {
+                    if (text === context.topic)
+                        return;
+                    context.topic = text;
+                    typeSelect.refresh();
+                }
             }
             RefreshButton {
                 objectName: "actionTopicRefreshButton"
+
                 onClicked: {
                     animate = true;
                     topicSelect.refresh();
                     animate = false;
                 }
             }
-
             FuzzySelector {
                 id: typeSelect
-                objectName: "actionTypeSelector"
-                Layout.fillWidth: true
-                placeholderText: qsTr("Action Type")
-                text: context.type ?? ""
-                onTextChanged: {
-                    if (text === context.type)
-                        return;
-                    context.type = text;
-                    if (!context.type)
-                        return;
-                    if (requestModel.message && requestModel.message["#messageType"] == context.type + "_Goal")
-                        return;
-                    requestModel.message = Ros2.createEmptyActionGoal(context.type);
-                }
                 function refresh() {
                     let types = !!context.topic ? Ros2.getActionTypes(context.topic) : [];
                     if (types.length == 0)
@@ -77,10 +68,27 @@ Rectangle {
                         typeSelect.text = types.length > 0 ? types[0] : "";
                     }
                 }
+
+                Layout.fillWidth: true
+                objectName: "actionTypeSelector"
+                placeholderText: qsTr("Action Type")
+                text: context.type ?? ""
+
                 Component.onCompleted: refresh()
+                onTextChanged: {
+                    if (text === context.type)
+                        return;
+                    context.type = text;
+                    if (!context.type)
+                        return;
+                    if (requestModel.message && requestModel.message["#messageType"] == context.type + "_Goal")
+                        return;
+                    requestModel.message = Ros2.createEmptyActionGoal(context.type);
+                }
             }
             RefreshButton {
                 objectName: "actionTypeRefreshButton"
+
                 onClicked: {
                     animate = true;
                     typeSelect.refresh();
@@ -90,57 +98,60 @@ Rectangle {
         }
         TabBar {
             id: tabBar
-            objectName: "actionTabBar"
             Layout.fillWidth: true
+            objectName: "actionTabBar"
+
             TabButton {
                 text: qsTr("Request")
             }
             TabButton {
-                text: qsTr("Feedback")
                 enabled: !!d.goalHandle
+                text: qsTr("Feedback")
             }
             TabButton {
-                text: qsTr("Result")
                 enabled: !!d.goalHandle
+                text: qsTr("Result")
             }
         }
-
         StackLayout {
-            Layout.fillWidth: true
             Layout.fillHeight: true
+            Layout.fillWidth: true
             currentIndex: tabBar.currentIndex
 
             // Request Tab
             MessageContentEditor {
                 id: requestEditor
-                objectName: "actionRequestEditor"
-                Layout.fillWidth: true
                 Layout.fillHeight: true
+                Layout.fillWidth: true
+                objectName: "actionRequestEditor"
+                readonly: false
+
                 model: MessageItemModel {
                     id: requestModel
-                    onModified: {
-                        if (message == context.request)
-                            return;
-                        context.request = message;
-                    }
                     Component.onCompleted: {
                         if (!!context.request)
                             message = context.request;
                         else if (!!context.type)
                             message = Ros2.createEmptyActionGoal(context.type);
                     }
+                    onModified: {
+                        if (message == context.request)
+                            return;
+                        context.request = message;
+                    }
                 }
-                readonly: false
             }
 
             // Feedback Tab
             Item {
-                Layout.fillWidth: true
                 Layout.fillHeight: true
+                Layout.fillWidth: true
+
                 Rectangle {
-                    visible: !feedbackLayout.visible
                     anchors.fill: parent
                     color: root.palette.base
+                    visible: !feedbackLayout.visible
+
                     Label {
                         anchors.centerIn: parent
                         text: "No feedback available."
@@ -153,30 +164,33 @@ Rectangle {
 
                     ListView {
                         id: feedbackList
-                        objectName: "actionFeedbackList"
                         Layout.fillHeight: true
                         Layout.preferredWidth: 120
                         clip: true
                         model: d.feedbackMessages
+                        objectName: "actionFeedbackList"
 
                         delegate: ItemDelegate {
-                            width: feedbackList.width
-                            highlighted: ListView.isCurrentItem
                             required property int index
                             required property var message
-                            onClicked: feedbackList.currentIndex = index
 
+                            highlighted: ListView.isCurrentItem
                             text: index
+                            width: feedbackList.width
+
+                            onClicked: feedbackList.currentIndex = index
                         }
                     }
                     MessageContentEditor {
                         id: feedbackEditor
-                        objectName: "actionFeedbackEditor"
-                        Layout.fillWidth: true
                         Layout.fillHeight: true
+                        Layout.fillWidth: true
+                        objectName: "actionFeedbackEditor"
                         readonly: true
+
                         model: MessageItemModel {
                             message: feedbackList.currentItem && feedbackList.currentItem.message || null
+
                             onMessageChanged: feedbackEditor.expandRecursively()
                         }
                     }
@@ -185,12 +199,14 @@ Rectangle {
 
             // Result Tab
             Item {
-                Layout.fillWidth: true
                 Layout.fillHeight: true
+                Layout.fillWidth: true
+
                 Rectangle {
-                    visible: !resultEditor.visible
                     anchors.fill: parent
                     color: root.palette.base
+                    visible: !resultEditor.visible
+
                     Label {
                         anchors.centerIn: parent
                         text: "No result available yet."
@@ -199,25 +215,27 @@ Rectangle {
                 MessageContentEditor {
                     id: resultEditor
                     anchors.fill: parent
-                    visible: d.client && d.goalHandle && d.result
                     readonly: true
+                    visible: d.client && d.goalHandle && d.result
+
                     model: MessageItemModel {
                         message: d.result && d.result.result || null
+
                         onMessageChanged: resultEditor.expandRecursively()
                     }
                 }
             }
         }
-
         RowLayout {
             Layout.fillWidth: true
+
             Label {
                 text: "Status: "
             }
             Label {
                 id: statusText
-                objectName: "actionStatusLabel"
                 Layout.fillWidth: true
+                objectName: "actionStatusLabel"
                 text: {
                     if (!d.client)
                         return "None";
@@ -229,9 +247,10 @@ Rectangle {
                 }
             }
             Button {
-                objectName: "actionSendCancelButton"
                 enabled: (d.client?.ready && d.goalHandle?.status != ActionGoalStatus.Canceling) ?? false
+                objectName: "actionSendCancelButton"
                 text: d.goalHandle && !d.result ? "Cancel" : "Send Goal"
+
                 onClicked: {
                     if (d.goalHandle && d.goalHandle.isActive) {
                         d.goalHandle.cancel();
@@ -240,46 +259,47 @@ Rectangle {
                     d.resetState();
                     tabBar.currentIndex = 1;
                     d.client.sendGoalAsync(requestEditor.model.message, {
-                        onGoalResponse: function (goalHandle) {
-                            if (!goalHandle) {
-                                Ros2.warn("Goal rejected by server");
-                                return;
+                            "onGoalResponse": function (goalHandle) {
+                                if (!goalHandle) {
+                                    Ros2.warn("Goal rejected by server");
+                                    return;
+                                }
+                                Ros2.debug("Goal accepted by server, waiting for result");
+                                d.goalHandle = goalHandle;
+                            },
+                            "onFeedback": function (goalHandle, feedback) {
+                                if (!d.goalHandle || goalHandle.goalId != d.goalHandle.goalId) {
+                                    Ros2.warn("Received feedback for old goal handle. Ignoring.");
+                                    return;
+                                }
+                                const displayingLatest = feedbackList.currentIndex == d.feedbackMessages.count - 1;
+                                d.feedbackMessages.append({
+                                        "message": feedback
+                                    });
+                                if (displayingLatest)
+                                    feedbackList.currentIndex = d.feedbackMessages.count - 1;
+                            },
+                            "onResult": function (result) {
+                                tabBar.currentIndex = 2;
+                                d.result = result;
                             }
-                            Ros2.debug("Goal accepted by server, waiting for result");
-                            d.goalHandle = goalHandle;
-                        },
-                        onFeedback: function (goalHandle, feedback) {
-                            if (!d.goalHandle || goalHandle.goalId != d.goalHandle.goalId) {
-                                Ros2.warn("Received feedback for old goal handle. Ignoring.");
-                                return;
-                            }
-                            const displayingLatest = feedbackList.currentIndex == d.feedbackMessages.count - 1;
-                            d.feedbackMessages.append({
-                                message: feedback
-                            });
-                            if (displayingLatest)
-                                feedbackList.currentIndex = d.feedbackMessages.count - 1;
-                        },
-                        onResult: function (result) {
-                            tabBar.currentIndex = 2;
-                            d.result = result;
-                        }
-                    });
+                        });
                 }
             }
         }
     }
-
     QtObject {
         id: d
+
         property var client: {
             d.resetState();
             if (!context.topic || !context.type || !Ros2.isValidTopic(context.topic))
                 return null;
             return Ros2.createActionClient(context.topic, context.type);
         }
+        property var feedbackMessages: ListModel {
+        }
         property var goalHandle: null
-        property var feedbackMessages: ListModel {}
         property var result: null
 
         function resetState() {

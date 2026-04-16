@@ -6,64 +6,59 @@ import RQml.Elements
 import RQml.Utils
 
 Item {
-    width: 800
     height: 600
+    width: 800
 
     EditMessageDialog {
         id: dialog
-        visible: true
         anchors.centerIn: parent
-        width: 700
         height: 500
-        messageType: "ros_babel_fish_test_msgs/msg/TestMessage"
         message: Ros2.createEmptyMessage("ros_babel_fish_test_msgs/msg/TestMessage")
+        messageType: "ros_babel_fish_test_msgs/msg/TestMessage"
+        visible: true
+        width: 700
     }
-
     TestCase {
-        name: "EditMessageDialogTest"
-        when: windowShown
 
         // ---- Helpers --------------------------------------------------------
-
         function findItemBy(item, predicate) {
-            if (!item) return null;
-            if (predicate(item)) return item;
+            if (!item)
+                return null;
+            if (predicate(item))
+                return item;
             var children = item.children || [];
             for (var i = 0; i < children.length; ++i) {
                 var found = findItemBy(children[i], predicate);
-                if (found) return found;
+                if (found)
+                    return found;
             }
             if (item.contentItem && item.contentItem !== item) {
                 var f = findItemBy(item.contentItem, predicate);
-                if (f) return f;
+                if (f)
+                    return f;
             }
             return null;
         }
-
-        function findTabBar() {
-            return findItemBy(dialog, function (c) {
-                return c && c.toString().indexOf("TabBar") !== -1 && c.hasOwnProperty("currentIndex");
-            });
-        }
-
-        function findStackLayout() {
-            return findItemBy(dialog, function (c) {
-                return c && c.toString().indexOf("StackLayout") !== -1;
-            });
-        }
-
-        function findTextArea() {
-            return findItemBy(dialog, function (c) {
-                return c && c.toString().indexOf("TextArea") !== -1 && c.hasOwnProperty("text");
-            });
-        }
-
         function findMessageContentEditor() {
             return findItemBy(dialog, function (c) {
-                return c && c.toString().indexOf("MessageContentEditor") !== -1;
-            });
+                    return c && c.toString().indexOf("MessageContentEditor") !== -1;
+                });
         }
-
+        function findStackLayout() {
+            return findItemBy(dialog, function (c) {
+                    return c && c.toString().indexOf("StackLayout") !== -1;
+                });
+        }
+        function findTabBar() {
+            return findItemBy(dialog, function (c) {
+                    return c && c.toString().indexOf("TabBar") !== -1 && c.hasOwnProperty("currentIndex");
+                });
+        }
+        function findTextArea() {
+            return findItemBy(dialog, function (c) {
+                    return c && c.toString().indexOf("TextArea") !== -1 && c.hasOwnProperty("text");
+                });
+        }
         function init() {
             dialog.message = Ros2.createEmptyMessage("ros_babel_fish_test_msgs/msg/TestMessage");
             wait(50);
@@ -76,20 +71,35 @@ Item {
         }
 
         // ---- Tests ----------------------------------------------------------
-
         function test_dualTabInterface() {
             var tabBar = findTabBar();
             var stack = findStackLayout();
             verify(tabBar !== null, "TabBar should exist");
             verify(stack !== null, "StackLayout should exist");
             compare(tabBar.count, 2, "should have Visual and Text tabs");
-
             tabBar.currentIndex = 0;
             compare(stack.currentIndex, 0, "Visual tab should select index 0");
             tabBar.currentIndex = 1;
             compare(stack.currentIndex, 1, "Text tab should select index 1");
         }
-
+        function test_invalidJsonIsIgnored() {
+            var textArea = findTextArea();
+            var prevI32 = dialog.message.i32;
+            textArea.text = "{ this is not valid json";
+            textArea.editingFinished();
+            // The message must remain unchanged.
+            compare(dialog.message.i32, prevI32, "invalid JSON must not corrupt the bound message");
+        }
+        function test_jsonEditUpdatesMessage() {
+            var textArea = findTextArea();
+            // Build a fresh JSON snapshot, mutate one field, write it back, and
+            // simulate editingFinished — the dialog should update its message.
+            var snapshot = JSON.parse(textArea.text);
+            snapshot.i32 = 314;
+            textArea.text = JSON.stringify(snapshot);
+            textArea.editingFinished();
+            compare(dialog.message.i32, 314, "valid JSON edit should update the bound message");
+        }
         function test_jsonSerializationFromMessage() {
             var textArea = findTextArea();
             verify(textArea !== null);
@@ -104,29 +114,12 @@ Item {
             verify(parsed.hasOwnProperty("i32"), "JSON should contain i32 field");
             verify(parsed.hasOwnProperty("b"), "JSON should contain bool field");
         }
-
-        function test_jsonEditUpdatesMessage() {
-            var textArea = findTextArea();
-            // Build a fresh JSON snapshot, mutate one field, write it back, and
-            // simulate editingFinished — the dialog should update its message.
-            var snapshot = JSON.parse(textArea.text);
-            snapshot.i32 = 314;
-            textArea.text = JSON.stringify(snapshot);
-            textArea.editingFinished();
-            compare(dialog.message.i32, 314,
-                "valid JSON edit should update the bound message");
+        function test_standardOkCancelButtons() {
+            // Dialog.Ok | Dialog.Cancel — verify the standardButton accessor
+            // returns valid buttons for both.
+            verify(dialog.standardButton(Dialog.Ok) !== null, "Ok button should be present");
+            verify(dialog.standardButton(Dialog.Cancel) !== null, "Cancel button should be present");
         }
-
-        function test_invalidJsonIsIgnored() {
-            var textArea = findTextArea();
-            var prevI32 = dialog.message.i32;
-            textArea.text = "{ this is not valid json";
-            textArea.editingFinished();
-            // The message must remain unchanged.
-            compare(dialog.message.i32, prevI32,
-                "invalid JSON must not corrupt the bound message");
-        }
-
         function test_visualEditPropagatesToText() {
             var editor = findMessageContentEditor();
             var textArea = findTextArea();
@@ -149,21 +142,15 @@ Item {
             verify(done, "i32 field should be present");
             // The dialog updates textArea.text via Qt.binding on `modified`.
             tryVerify(function () {
-                try {
-                    return JSON.parse(textArea.text).i32 === 9001;
-                } catch (e) {
-                    return false;
-                }
-            }, 1000, "text area should reflect visual edits");
+                    try {
+                        return JSON.parse(textArea.text).i32 === 9001;
+                    } catch (e) {
+                        return false;
+                    }
+                }, 1000, "text area should reflect visual edits");
         }
 
-        function test_standardOkCancelButtons() {
-            // Dialog.Ok | Dialog.Cancel — verify the standardButton accessor
-            // returns valid buttons for both.
-            verify(dialog.standardButton(Dialog.Ok) !== null,
-                "Ok button should be present");
-            verify(dialog.standardButton(Dialog.Cancel) !== null,
-                "Cancel button should be present");
-        }
+        name: "EditMessageDialogTest"
+        when: windowShown
     }
 }

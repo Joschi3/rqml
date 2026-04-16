@@ -14,7 +14,6 @@
  *  You should have received a copy of the GNU General Public License
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-
 import QtQml.Models
 import QtQuick
 import QtQuick.Controls
@@ -23,19 +22,19 @@ import QtQuick.Layouts
 
 Dialog {
     id: root
-    x: (parent.width - width) / 2
-    y: 0
-    focus: true
-    standardButtons: Dialog.NoButton
-    padding: 12
-    width: Math.min(mainWindow.width * 0.6, 640)
-    height: Math.min(mainWindow.height * 0.6, 480)
-    title: qsTr("Save Configuration")
-
     function openAndFocus() {
         open();
         nameInput.forceActiveFocus();
     }
+
+    focus: true
+    height: Math.min(mainWindow.height * 0.6, 480)
+    padding: 12
+    standardButtons: Dialog.NoButton
+    title: qsTr("Save Configuration")
+    width: Math.min(mainWindow.width * 0.6, 640)
+    x: (parent.width - width) / 2
+    y: 0
 
     QtObject {
         id: d
@@ -50,13 +49,13 @@ Dialog {
             if (RQml.fileExists(path)) {
                 let overwrite = Qt.createQmlObject('import QtQuick.Dialogs; MessageDialog { title: "Overwrite Confirmation"; text: "A configuration named \\"' + name + '\\" already exists in the selected directory. Do you want to overwrite it?"; buttons: MessageDialog.Yes | MessageDialog.Cancel; }', root);
                 overwrite.buttonClicked.connect(function (button) {
-                    if (button === MessageDialog.Yes) {
-                        RQml.save(path);
-                        nameInput.text = "";
-                        root.close();
-                    }
-                    overwrite.destroy();
-                });
+                        if (button === MessageDialog.Yes) {
+                            RQml.save(path);
+                            nameInput.text = "";
+                            root.close();
+                        }
+                        overwrite.destroy();
+                    });
                 overwrite.open();
                 return;
             }
@@ -65,7 +64,6 @@ Dialog {
             root.close();
         }
     }
-
     ColumnLayout {
         anchors.fill: parent
         spacing: 8
@@ -73,8 +71,9 @@ Dialog {
         TextField {
             id: nameInput
             Layout.fillWidth: true
-            placeholderText: qsTr("Enter name for configuration")
             focus: true
+            placeholderText: qsTr("Enter name for configuration")
+
             Keys.onPressed: event => {
                 if (event.key === Qt.Key_Down) {
                     configDirectoriesList.moveDown();
@@ -91,47 +90,63 @@ Dialog {
                 }
             }
         }
-
         Label {
-            text: qsTr("Select directory to save configuration:")
             font.bold: true
+            text: qsTr("Select directory to save configuration:")
         }
-
         ListView {
             id: configDirectoriesList
-            Layout.fillWidth: true
+            function moveDown() {
+                let newCurrentIndex = currentIndex + 1;
+                if (newCurrentIndex >= model.count)
+                    newCurrentIndex = 0;
+                currentIndex = newCurrentIndex;
+            }
+            function moveUp() {
+                let newCurrentIndex = currentIndex - 1;
+                if (newCurrentIndex < 0)
+                    newCurrentIndex = model.count - 1;
+                currentIndex = newCurrentIndex;
+            }
+
             Layout.fillHeight: true
+            Layout.fillWidth: true
             clip: true
-            model: RQml.configDirectories
             currentIndex: 0
+            model: RQml.configDirectories
+
             delegate: ItemDelegate {
-                width: configDirectoriesList.width
                 highlighted: ListView.isCurrentItem
+                width: configDirectoriesList.width
+
+                contentItem: Column {
+                    spacing: 2
+                    width: parent.width - 16
+                    x: 8
+
+                    Label {
+                        Layout.topMargin: 4
+                        elide: Text.ElideRight
+                        font.bold: true
+                        text: modelData.split("/").pop()
+                        width: parent.width
+                    }
+                    Label {
+                        Layout.bottomMargin: 4
+                        elide: Text.ElideMiddle
+                        font.pixelSize: Math.round(Qt.application.font.pixelSize * 0.9)
+                        opacity: 0.7
+                        text: modelData
+                        width: parent.width
+                    }
+                }
+
                 onClicked: {
                     configDirectoriesList.currentIndex = index;
                     nameInput.forceActiveFocus();
                 }
-                contentItem: Column {
-                    x: 8
-                    width: parent.width - 16
-                    spacing: 2
-                    Label {
-                        Layout.topMargin: 4
-                        width: parent.width
-                        text: modelData.split("/").pop()
-                        font.bold: true
-                        elide: Text.ElideRight
-                    }
-                    Label {
-                        Layout.bottomMargin: 4
-                        width: parent.width
-                        text: modelData
-                        font.pixelSize: Math.round(Qt.application.font.pixelSize * 0.9)
-                        opacity: 0.7
-                        elide: Text.ElideMiddle
-                    }
-                }
             }
+
             Keys.onPressed: event => {
                 if (event.key === Qt.Key_Down) {
                     moveDown();
@@ -146,20 +161,6 @@ Dialog {
                     root.close();
                     event.accepted = true;
                 }
-            }
-
-            function moveUp() {
-                let newCurrentIndex = currentIndex - 1;
-                if (newCurrentIndex < 0)
-                    newCurrentIndex = model.count - 1;
-                currentIndex = newCurrentIndex;
-            }
-
-            function moveDown() {
-                let newCurrentIndex = currentIndex + 1;
-                if (newCurrentIndex >= model.count)
-                    newCurrentIndex = 0;
-                currentIndex = newCurrentIndex;
             }
         }
     }

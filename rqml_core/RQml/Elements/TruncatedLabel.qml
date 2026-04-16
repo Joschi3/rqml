@@ -14,23 +14,22 @@
  *  You should have received a copy of the GNU General Public License
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-
 import QtQuick
 import QtQuick.Controls
 
 Label {
-  id: control
-  elide: Text.ElideRight
+    id: control
+    elide: Text.ElideRight
 
-  MouseArea {
-    anchors.fill: parent
-    hoverEnabled: true
-    propagateComposedEvents: true
-    acceptedButtons: Qt.NoButton
+    MouseArea {
+        property bool fullyVisible: !control.truncated && control.contentWidth <= control.width && control.contentHeight <= control.height
 
-    ToolTip.delay: Application.styleHints.mousePressAndHoldInterval
-    property bool fullyVisible: !control.truncated && control.contentWidth <= control.width && control.contentHeight <= control.height
-    ToolTip.visible: !fullyVisible && (containsMouse || pressed)
-    ToolTip.text: control.text
-  }
+        ToolTip.delay: Application.styleHints.mousePressAndHoldInterval
+        ToolTip.text: control.text
+        ToolTip.visible: !fullyVisible && (containsMouse || pressed)
+        acceptedButtons: Qt.NoButton
+        anchors.fill: parent
+        hoverEnabled: true
+        propagateComposedEvents: true
+    }
 }

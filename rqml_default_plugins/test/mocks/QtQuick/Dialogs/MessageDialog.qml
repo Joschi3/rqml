@@ -3,19 +3,23 @@ import QtQuick
 QtObject {
     id: root
 
-    property string title: ""
-    property string text: ""
-    property string informativeText: ""
-    property string detailedText: ""
-    property int buttons: 0
-    property int modality: Qt.NonModal
-
     // Standard button flag for Ok
-    enum StandardButtons { Ok = 0x00000400 }
+    enum StandardButtons {
+        Ok = 1024
+    }
 
-    signal accepted()
-    signal rejected()
+    property int buttons: 0
+    property string detailedText: ""
+    property string informativeText: ""
+    property int modality: Qt.NonModal
+    property string text: ""
+    property string title: ""
 
-    function open() {}
-    function close() {}
+    signal accepted
+    signal rejected
+
+    function close() {
+    }
+    function open() {
+    }
 }

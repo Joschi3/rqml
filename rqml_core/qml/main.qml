@@ -14,7 +14,6 @@
  *  You should have received a copy of the GNU General Public License
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-
 import QtCore
 import QtQuick
 import QtQuick.Controls
@@ -28,135 +27,136 @@ import "."
 
 ApplicationWindow {
     id: mainWindow
-    visible: true
-    width: 640
-    height: 480
-    minimumWidth: 480
-    minimumHeight: 320
-    title: "RQml" + (RQml.devMode ? " [DEV MODE]" : "")
-    color: active ? palette.active.window : palette.inactive.window
+
     property string currentShortcutHint: UsageHints.getHint("")
 
-    Component.onCompleted: {
-        if (!Ros2.isInitialized()) {
-            Ros2.init("rqml");
-        }
-    }
+    color: active ? palette.active.window : palette.inactive.window
+    height: 480
+    minimumHeight: 320
+    minimumWidth: 480
+    title: "RQml" + (RQml.devMode ? " [DEV MODE]" : "")
+    visible: true
+    width: 640
 
     menuBar: MenuBar {
         Menu {
             title: qsTr("&File")
 
             Action {
-                text: qsTr("Save config")
                 shortcut: "Ctrl+S"
+                text: qsTr("Save config")
+
                 onTriggered: {
                     RQml.save();
                 }
             }
-
             Action {
-                text: qsTr("Save config as…")
                 shortcut: "Ctrl+Shift+S"
+                text: qsTr("Save config as…")
+
                 onTriggered: {
                     saveConfigDialog.openAndFocus();
                 }
             }
-
             Action {
-                text: qsTr("Load config")
                 shortcut: "Ctrl+O"
+                text: qsTr("Load config")
+
                 onTriggered: {
                     openConfigDialog.recent = false;
                     openConfigDialog.openAndFocus();
                 }
             }
-
             Action {
-                text: qsTr("Recent configs")
                 shortcut: "Ctrl+R"
+                text: qsTr("Recent configs")
+
                 onTriggered: {
                     openConfigDialog.recent = true;
                     openConfigDialog.openAndFocus();
                 }
             }
-
-            MenuSeparator {}
-
+            MenuSeparator {
+            }
             Action {
                 text: qsTr("Reload current config")
+
                 onTriggered: {
                     RQml.load(RQml.currentConfig.path);
                 }
             }
-
             Action {
-                text: qsTr("Close focused plugin")
                 shortcut: "Ctrl+W"
+                text: qsTr("Close focused plugin")
+
                 onTriggered: {
                     RQml.closeFocusedPlugin();
                 }
             }
-
             Action {
                 text: qsTr("Close All")
+
                 onTriggered: {
                     KDDW.Singletons.dockRegistry.clear();
                 }
             }
-
             Action {
                 text: qsTr("Settings")
+
                 onTriggered: {
                     settingsDialog.open();
                 }
             }
-
-            MenuSeparator {}
+            MenuSeparator {
+            }
             Action {
-                text: qsTr("&Quit")
                 shortcut: "Ctrl+Q"
+                text: qsTr("&Quit")
+
                 onTriggered: {
                     Qt.quit();
                 }
             }
         }
-
-        MenuSeparator {}
-
+        MenuSeparator {
+        }
         Menu {
             id: pluginsMenu
             title: qsTr("&Plugins")
 
             Action {
-                text: qsTr("Search plugins…")
                 shortcut: "Ctrl+P"
+                text: qsTr("Search plugins…")
+
                 onTriggered: {
                     openPluginDialog.openAndFocus();
                 }
             }
-
-            MenuSeparator {}
-
+            MenuSeparator {
+            }
             Instantiator {
                 model: {
                     let groups = new Set();
                     RQml.plugins.forEach(plugin => {
-                        if (plugin.group) {
-                            groups.add(plugin.group);
-                        }
-                    });
+                            if (plugin.group) {
+                                groups.add(plugin.group);
+                            }
+                        });
                     return Array.from(groups);
                 }
+
                 onObjectAdded: (index, object) => pluginsMenu.insertMenu(index + 2, object)
                 onObjectRemoved: (index, object) => pluginsMenu.removeMenu(index + 2, object)
 
                 Menu {
                     title: modelData
+
                     Repeater {
                         model: RQml.plugins.filter(plugin => plugin.group === modelData)
+
                         MenuItem {
                             text: modelData.name
+
                             onTriggered: {
                                 let instance = RQml.createPlugin(modelData.id);
                                 if (!instance)
@@ -169,8 +169,10 @@ ApplicationWindow {
             }
             Repeater {
                 model: RQml.plugins.filter(plugin => plugin.group === "")
+
                 MenuItem {
                     text: modelData.name
+
                     onTriggered: {
                         let instance = RQml.createPlugin(modelData.id);
                         if (!instance)
@@ -180,31 +182,37 @@ ApplicationWindow {
                 }
             }
         }
-
         Menu {
             title: qsTr("&Help")
 
             Action {
-                text: qsTr("Dev Mode")
                 checkable: true
                 checked: RQml.devMode
+                text: qsTr("Dev Mode")
+
                 onToggled: RQml.devMode = checked
             }
-
             Action {
+                enabled: RQml.canCreateDesktopEntry()
                 text: qsTr("Create Desktop Entry")
+
                 onTriggered: {
                     RQml.createDesktopEntry();
                 }
-                enabled: RQml.canCreateDesktopEntry()
             }
-
             Action {
                 text: qsTr("About")
+
                 onTriggered: {
                     aboutDialog.open();
                 }
             }
+        }
+    }
+
+    Component.onCompleted: {
+        if (!Ros2.isInitialized()) {
+            Ros2.init("rqml");
         }
     }
 
@@ -220,62 +228,56 @@ ApplicationWindow {
             spacing: Qt.application.font.pixelSize / 2
 
             Label {
-                text: qsTr("No plugins loaded.")
                 font.bold: true
                 font.pixelSize: Qt.application.font.pixelSize * 1.6
+                text: qsTr("No plugins loaded.")
             }
             Label {
-                text: qsTr("Load plugins from the 'Plugins' menu.")
                 font.pixelSize: Qt.application.font.pixelSize * 1.2
+                text: qsTr("Load plugins from the 'Plugins' menu.")
             }
         }
         Image {
-            source: "qrc:/assets/mascot/magnifying_glass.png"
-            height: Qt.application.font.pixelSize * 12
             fillMode: Image.PreserveAspectFit
+            height: Qt.application.font.pixelSize * 12
             mipmap: true
+            source: "qrc:/assets/mascot/magnifying_glass.png"
         }
     }
     Hint {
         anchors.horizontalCenter: noPluginsLoadedRow.horizontalCenter
         anchors.top: noPluginsLoadedRow.bottom
         anchors.topMargin: 32
-        width: Math.min(implicitWidth, noPluginsLoadedRow.width)
         text: qsTr("Hint: %1").arg(mainWindow.currentShortcutHint)
+        width: Math.min(implicitWidth, noPluginsLoadedRow.width)
     }
-
     Timer {
         interval: 30000
         repeat: true
         running: true
+
         onTriggered: {
             mainWindow.currentShortcutHint = UsageHints.getHint(mainWindow.currentShortcutHint);
         }
     }
-
     KDDW.DockingArea {
         id: rootDockingArea
         anchors.fill: parent
         // Each main layout needs a unique id
         uniqueName: "MainLayout-1"
     }
-
     AboutDialog {
         id: aboutDialog
     }
-
     SettingsDialog {
         id: settingsDialog
     }
-
     OpenConfigDialog {
         id: openConfigDialog
     }
-
     OpenPluginDialog {
         id: openPluginDialog
     }
-
     SaveConfigDialog {
         id: saveConfigDialog
     }

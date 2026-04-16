@@ -189,7 +189,6 @@ Object {
             return info.title;
         return "Motion failed: " + (info ? info.name : "UNKNOWN_ERROR");
     }
-
     function _getJoint(jointName) {
         for (let i = 0; i < root.joints.count; i++) {
             let joint = root.joints.get(i);

@@ -14,7 +14,6 @@
  *  You should have received a copy of the GNU General Public License
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-
 import QtQuick.Controls
 import QtQuick.Layouts
 import Ros2
@@ -22,18 +21,22 @@ import RQml.Utils
 
 Dialog {
     id: control
-    title: "Edit Message Content"
-    standardButtons: Dialog.Ok | Dialog.Cancel
+
     property alias message: messageModel.message
     property alias messageType: messageModel.messageType
+
+    standardButtons: Dialog.Ok | Dialog.Cancel
+    title: "Edit Message Content"
 
     ColumnLayout {
         anchors.fill: parent
         anchors.margins: 12
         spacing: 12
+
         TabBar {
             id: tabBar
             Layout.fillWidth: true
+
             TabButton {
                 text: qsTr("Visual")
             }
@@ -41,28 +44,30 @@ Dialog {
                 text: qsTr("Text")
             }
         }
-
         StackLayout {
-            Layout.fillWidth: true
             Layout.fillHeight: true
+            Layout.fillWidth: true
             currentIndex: tabBar.currentIndex
+
             MessageContentEditor {
                 id: messageContentEditor
-                Layout.fillWidth: true
                 Layout.fillHeight: true
+                Layout.fillWidth: true
+
                 model: MessageItemModel {
                     id: messageModel
-                    onModified: {
-                        textArea.text = Qt.binding(() => JSON.stringify(MessageUtils.toJavaScriptObject(control.message) ?? {}, null, 2));
-                    }
                     onMessageChanged: {
                         messageContentEditor.expandRecursively();
+                    }
+                    onModified: {
+                        textArea.text = Qt.binding(() => JSON.stringify(MessageUtils.toJavaScriptObject(control.message) ?? {}, null, 2));
                     }
                 }
             }
             ScrollView {
-                Layout.fillWidth: true
                 Layout.fillHeight: true
+                Layout.fillWidth: true
+
                 TextArea {
                     id: textArea
                     anchors.fill: parent
@@ -71,8 +76,9 @@ Dialog {
                     onEditingFinished: {
                         try {
                             control.message = JSON.parse(text);
-                        } catch (e) {
-                            // ignore parse errors
+                        } catch (e)
+                        // ignore parse errors
+                        {
                         }
                     }
                 }

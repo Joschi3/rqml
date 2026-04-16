@@ -5,9 +5,7 @@ import QtQuick.Controls.Material
 Rectangle {
     //! possible values: "unconfigured", "inactive", "active", "unloaded", "unknown"
     property string state: "unknown"
-    height: Math.min(16, parent.height - 8)
-    width: height
-    radius: height / 2
+
     color: {
         if (state === "active")
             return Material.color(Material.Green);
@@ -21,4 +19,7 @@ Rectangle {
             return Material.color(Material.Purple);
         return Material.color(Material.Red);
     }
+    height: Math.min(16, parent.height - 8)
+    radius: height / 2
+    width: height
 }

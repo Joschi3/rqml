@@ -13,49 +13,52 @@
  *  You should have received a copy of the GNU General Public License
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-
 import QtQuick
 import QtTest
 import Ros2
 
 Item {
     id: root
-    width: 1024; height: 768
 
     property var context: contextObj
-    QtObject {
-        id: contextObj
-        property string topic: "/camera/image_raw"
-        property string transport: "raw"
-        property bool enabled: true
-        property bool invert: false
-        property bool colorize: false
-        property real depth: 3.0
-        property int rotation: 0
-    }
-
-    Utils { id: helpers }
-
-    Loader {
-        id: pluginLoader
-        anchors.fill: parent
-        function reload() { source = ""; source = "../qml/ImageView.qml"; }
-    }
-
     property var plugin: pluginLoader.item
 
-    function find(name) { return helpers.findChild(root, name); }
+    function find(name) {
+        return helpers.findChild(root, name);
+    }
 
+    height: 768
+    width: 1024
+
+    QtObject {
+        id: contextObj
+
+        property bool colorize: false
+        property real depth: 3.0
+        property bool enabled: true
+        property bool invert: false
+        property int rotation: 0
+        property string topic: "/camera/image_raw"
+        property string transport: "raw"
+    }
+    Utils {
+        id: helpers
+    }
+    Loader {
+        id: pluginLoader
+        function reload() {
+            source = "";
+            source = "../qml/ImageView.qml";
+        }
+
+        anchors.fill: parent
+    }
     TestCase {
         id: testCase
-        name: "ImageViewTest"
-        when: windowShown
-
         function init() {
             Ros2.reset();
             // Discovery setup for image topics
             Ros2.registerTopic("/camera/image_raw", "sensor_msgs/msg/Image");
-
             contextObj.topic = "/camera/image_raw";
             contextObj.transport = "raw";
             contextObj.enabled = true;
@@ -63,28 +66,36 @@ Item {
             contextObj.colorize = false;
             contextObj.depth = 3.0;
             contextObj.rotation = 0;
-
             pluginLoader.reload();
-            tryVerify(function() { return pluginLoader.status === Loader.Ready; }, 2000, "Loader should be ready");
+            tryVerify(function () {
+                    return pluginLoader.status === Loader.Ready;
+                }, 2000, "Loader should be ready");
             wait(200);
         }
-
-        function test_plugin_loads() {
-            verify(plugin !== null, "ImageView plugin should load");
-        }
-
         function test_discovery() {
             var topicSelector = find("imageTopicSelector");
             verify(topicSelector !== null);
-
             topicSelector.text = "/camera/image_raw";
             tryCompare(contextObj, "topic", "/camera/image_raw", 3000, "Context topic should update");
         }
+        function test_invert_toggle() {
+            var invertCheckbox = null;
+            tryVerify(function () {
+                    invertCheckbox = find("imageInvertCheckbox");
+                    return invertCheckbox !== null;
+                }, 3000, "Invert checkbox should be found");
 
+            // Initially false
+            compare(invertCheckbox.checked, false);
+
+            // Simulating authentic click
+            mouseClick(invertCheckbox);
+            tryCompare(invertCheckbox, "checked", true, 2000, "Invert checkbox should be checked");
+            compare(contextObj.invert, true, "Context invert property should be true");
+        }
         function test_play_pause() {
             var playButton = find("imagePlayButton");
             verify(playButton !== null, "Play button found");
-
             compare(contextObj.enabled, true, "Should start enabled");
 
             // Simulating authentic click to pause
@@ -95,27 +106,12 @@ Item {
             mouseClick(playButton);
             tryCompare(contextObj, "enabled", true, 3000, "Context enabled property should be true after second click");
         }
-
-        function test_invert_toggle() {
-            var invertCheckbox = null;
-            tryVerify(function() {
-                invertCheckbox = find("imageInvertCheckbox");
-                return invertCheckbox !== null;
-            }, 3000, "Invert checkbox should be found");
-
-            // Initially false
-            compare(invertCheckbox.checked, false);
-
-            // Simulating authentic click
-            mouseClick(invertCheckbox);
-            tryCompare(invertCheckbox, "checked", true, 2000, "Invert checkbox should be checked");
-            compare(contextObj.invert, true, "Context invert property should be true");
+        function test_plugin_loads() {
+            verify(plugin !== null, "ImageView plugin should load");
         }
-
         function test_rotation_cycling() {
             var rotateLeft = find("imageRotateLeftButton");
             verify(rotateLeft !== null, "Rotate left button found");
-
             var rotationLabel = find("imageRotationLabel");
             verify(rotationLabel !== null, "Rotation label found");
 
@@ -127,10 +123,12 @@ Item {
             mouseClick(rotateLeft);
             tryCompare(contextObj, "rotation", 270, 2000);
             compare(rotationLabel.text, "270°");
-
             mouseClick(rotateLeft);
             tryCompare(contextObj, "rotation", 180, 2000);
             compare(rotationLabel.text, "180°");
         }
+
+        name: "ImageViewTest"
+        when: windowShown
     }
 }

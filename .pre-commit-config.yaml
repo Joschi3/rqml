@@ -79,3 +79,15 @@ repos:
         args: ["--verbose"]
       - id: check-compose-spec
         args: ["--verbose"]
+
+  - repo: local
+    hooks:
+      - id: qmlformat
+        name: qmlformat
+        entry: qmlformat
+        language: system
+        pass_filenames: true
+        # The -i flag formats the file in-place
+        # The optional -n flag normalizes the object attribute order based on Qt conventions
+        args: [-n, -i]
+        files: \.qml$

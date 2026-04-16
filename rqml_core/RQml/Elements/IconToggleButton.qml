@@ -2,19 +2,18 @@ import QtQuick.Controls
 import RQml.Fonts
 
 RoundButton {
-    property string iconOn
     property string iconOff
-    property string tooltipTextOn
+    property string iconOn
     property string tooltipTextOff
+    property string tooltipTextOn
 
-    implicitWidth: implicitHeight
+    ToolTip.delay: 500
+    ToolTip.text: checked ? tooltipTextOn : tooltipTextOff
+    ToolTip.visible: hovered && (checked && !!tooltipTextOn) || (!checked && !!tooltipTextOff)
+    checkable: true
     font.family: IconFont.name
     font.pixelSize: 18
-    text: checked ? iconOn : iconOff
-    checkable: true
+    implicitWidth: implicitHeight
     radius: 4
-
-    ToolTip.visible: hovered && (checked && !!tooltipTextOn) || (!checked && !!tooltipTextOff)
-    ToolTip.text: checked ? tooltipTextOn : tooltipTextOff
-    ToolTip.delay: 500
+    text: checked ? iconOn : iconOff
 }
