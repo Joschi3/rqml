@@ -2,27 +2,38 @@ import QtQuick
 import QtQuick.Dialogs
 import Ros2
 import RQml.Utils
+import "."
 
 Object {
     id: root
+
     property string controllerManager
     property string controllerName
-    property var controllers: ListModel {}
-    property var joints: ListModel {}
     property bool controllerReady: d.trajectoryClient && d.trajectoryClient.ready
+    property var controllers: ListModel {
+    }
     property bool hasRobotDescription: false
     property bool isGoalActive: false
+    property var joints: ListModel {
+    }
     //! If true, continuous joints always take the shortest path to the goal angle
     property bool takeShortestPath: false
 
-    onControllerManagerChanged: {
-        root.refresh();
+    function cancelGoals() {
+        if (!d.trajectoryClient || !d.trajectoryClient.ready) {
+            Ros2.warn("Action server not connected");
+            return;
+        }
+        d.trajectoryClient.cancelAllGoals();
     }
-
-    function refresh() {
-        root.loadControllers();
+    function getJoint(jointName) {
+        for (let i = 0; i < root.joints.count; i++) {
+            let joint = root.joints.get(i);
+            if (joint.name === jointName)
+                return joint;
+        }
+        return null;
     }
-
     function loadControllers() {
         if (!root.controllerManager)
             return;
@@ -30,26 +41,29 @@ Object {
             return; // Already requesting
         Ros2.debug("JointTrajectoryController: Loading controllers from " + root.controllerManager);
         d.listControllersClient.sendRequestAsync({}, function (response) {
-            if (!response) {
-                Ros2.warn("JointTrajectoryController: Failed to get controllers from " + root.controllerManager + ". Trying again.");
-                root.loadControllers();
-                return;
-            }
-            Ros2.debug("JointTrajectoryController: Received " + response.controller.length + " controllers from " + root.controllerManager);
-            controllers.clear();
-            for (let i = 0; i < response.controller.length; i++) {
-                let controller = response.controller.at(i);
-                if (!controller) continue;
-                if (controller.type !== "joint_trajectory_controller/JointTrajectoryController" || controller.state !== "active")
-                    continue;
-                controllers.append({
-                    name: controller.name,
-                    controller: controller
-                });
-            }
-        });
+                if (!response) {
+                    Ros2.warn("JointTrajectoryController: Failed to get controllers from " + root.controllerManager + ". Trying again.");
+                    root.loadControllers();
+                    return;
+                }
+                Ros2.debug("JointTrajectoryController: Received " + response.controller.length + " controllers from " + root.controllerManager);
+                controllers.clear();
+                for (let i = 0; i < response.controller.length; i++) {
+                    let controller = response.controller.at(i);
+                    if (!controller)
+                        continue;
+                    if (controller.type !== "joint_trajectory_controller/JointTrajectoryController" || controller.state !== "active")
+                        continue;
+                    controllers.append({
+                            "name": controller.name,
+                            "controller": controller
+                        });
+                }
+            });
     }
-
+    function refresh() {
+        root.loadControllers();
+    }
     function resetGoals() {
         for (let i = 0; i < root.joints.count; ++i) {
             let joint = root.joints.get(i);
@@ -65,7 +79,7 @@ Object {
         }
         let msg = Ros2.createEmptyActionGoal("control_msgs/action/FollowJointTrajectory");
         let goal = {
-            positions: []
+            "positions": []
         };
         let maxDiff = 0;
         for (let i = 0; i < root.joints.count; i++) {
@@ -81,47 +95,34 @@ Object {
         }
         const duration = Math.max(0.1, maxDiff / speed);
         goal.time_from_start = {
-            sec: Math.floor(duration),
-            nanosec: Math.floor((duration % 1) * 1e9)
+            "sec": Math.floor(duration),
+            "nanosec": Math.floor((duration % 1) * 1e9)
         };
         msg.trajectory.points.push(goal);
         Ros2.debug("JointTrajectoryController: Sending goal to action server with duration " + duration + "s. Positions: " + goal.positions);
         root.isGoalActive = true;
         d.trajectoryClient.sendGoalAsync(msg, {
-            onGoalResponse: function (goal_handle) {
-                if (!goal_handle) {
-                    Ros2.warn("JointTrajectoryController: Goal rejected by action server");
+                "onGoalResponse": function (goal_handle) {
+                    if (!goal_handle) {
+                        Ros2.warn("JointTrajectoryController: Goal rejected by action server");
+                        root.isGoalActive = false;
+                        return;
+                    }
+                },
+                "onResult": function (result) {
                     root.isGoalActive = false;
-                    return;
+                    Ros2.debug("JointTrajectoryController: Goal completed with code: " + result.code);
+                    if (result.code !== ActionResultCode.SUCCEEDED) {
+                        errorDialog.text = "Goal failed with code: " + result.code;
+                        errorDialog.informativeText = result.result.error_string || "";
+                        errorDialog.open();
+                    }
                 }
-            },
-            onResult: function (result) {
-                root.isGoalActive = false;
-                Ros2.debug("JointTrajectoryController: Goal completed with code: " + result.code);
-                if (result.code !== ActionResultCode.SUCCEEDED) {
-                    errorDialog.text = "Goal failed with code: " + result.code;
-                    errorDialog.informativeText = result.result.error_string || "";
-                    errorDialog.open();
-                }
-            }
-        });
+            });
     }
 
-    function cancelGoals() {
-        if (!d.trajectoryClient || !d.trajectoryClient.ready) {
-            Ros2.warn("Action server not connected");
-            return;
-        }
-        d.trajectoryClient.cancelAllGoals();
-    }
-
-    function getJoint(jointName) {
-        for (let i = 0; i < root.joints.count; i++) {
-            let joint = root.joints.get(i);
-            if (joint.name === jointName)
-                return joint;
-        }
-        return null;
+    onControllerManagerChanged: {
+        root.refresh();
     }
 
     MessageDialog {
@@ -129,12 +130,11 @@ Object {
         buttons: MessageDialog.Ok
         modality: Qt.WindowModal
     }
-
     Subscription {
         id: jointStateSubscription
-        topic: d.findBestMatch("/joint_states", "sensor_msgs/msg/JointState")
         messageType: "sensor_msgs/msg/JointState"
         throttleRate: 5
+        topic: d.findBestMatch("/joint_states", "sensor_msgs/msg/JointState")
 
         onNewMessage: msg => {
             for (let i = 0; i < msg.name.length; i++) {
@@ -156,12 +156,11 @@ Object {
             }
         }
     }
-
     Subscription {
         id: urdfSubscription
-        topic: d.findBestMatch("/robot_description", "std_msgs/msg/String")
         messageType: "std_msgs/msg/String"
         qos: Ros2.QoS().transient_local().reliable()
+        topic: d.findBestMatch("/robot_description", "std_msgs/msg/String")
 
         onNewMessage: msg => {
             if (!msg.data)
@@ -170,11 +169,11 @@ Object {
             parser.parseURDF(msg.data);
         }
     }
-
     Timer {
         interval: 500
-        running: true
         repeat: true
+        running: true
+
         onTriggered: {
             const jointStateTopic = d.findBestMatch("/joint_states", "sensor_msgs/msg/JointState");
             if (jointStateSubscription.topic !== jointStateTopic) {
@@ -188,9 +187,19 @@ Object {
             }
         }
     }
-
     QtObject {
         id: d
+
+        property var controller: {
+            if (!root.controllerName)
+                return null;
+            for (let i = 0; i < root.controllers.count; i++) {
+                let c = root.controllers.get(i);
+                if (c.name === root.controllerName)
+                    return c.controller;
+            }
+            return null;
+        }
         property var listControllersClient: {
             if (!root.controllerManager)
                 return null;
@@ -205,35 +214,6 @@ Object {
             const actionName = ns + "/" + d.controller.name + "/follow_joint_trajectory";
             Ros2.debug("JointTrajectoryController: Creating action client for " + actionName);
             return Ros2.createActionClient(actionName, "control_msgs/action/FollowJointTrajectory");
-        }
-        property var controller: {
-            if (!root.controllerName)
-                return null;
-            for (let i = 0; i < root.controllers.count; i++) {
-                let c = root.controllers.get(i);
-                if (c.name === root.controllerName)
-                    return c.controller;
-            }
-            return null;
-        }
-        onControllerChanged: {
-            for (let i = 0; i < root.joints.count; i++) {
-                let joint = root.joints.get(i);
-                joint.active = false;
-            }
-            if (!d.controller)
-                return;
-            for (let i = 0; i < d.controller.claimed_interfaces.length; i++) {
-                const name = d.extractJointName(d.controller.claimed_interfaces.at(i));
-                let joint = getJoint(name);
-                if (joint)
-                    joint.active = true;
-            }
-        }
-
-        function extractJointName(claimedInterface) {
-            const parts = claimedInterface.split("/");
-            return parts.length >= 2 ? parts[parts.length - 2] : parts[0];
         }
 
         function addJoint(joint) {
@@ -258,8 +238,8 @@ Object {
                 joint.goal = joint.position;
             if (!joint.limits)
                 joint.limits = {
-                    upper: Math.PI,
-                    lower: -Math.PI
+                    "upper": Math.PI,
+                    "lower": -Math.PI
                 };
             if (!joint.type)
                 joint.type = "unknown";
@@ -283,7 +263,10 @@ Object {
             }
             root.joints.insert(i, joint);
         }
-
+        function extractJointName(claimedInterface) {
+            const parts = claimedInterface.split("/");
+            return parts.length >= 2 ? parts[parts.length - 2] : parts[0];
+        }
         function findBestMatch(topic, messageType) {
             if (!root.controllerManager)
                 return "";
@@ -308,19 +291,32 @@ Object {
             }
             return best_match;
         }
-    }
 
+        onControllerChanged: {
+            for (let i = 0; i < root.joints.count; i++) {
+                let joint = root.joints.get(i);
+                joint.active = false;
+            }
+            if (!d.controller)
+                return;
+            for (let i = 0; i < d.controller.claimed_interfaces.length; i++) {
+                const name = d.extractJointName(d.controller.claimed_interfaces.at(i));
+                let joint = getJoint(name);
+                if (joint)
+                    joint.active = true;
+            }
+        }
+    }
     QtObject {
         id: parser
-
         function parseURDF(urdfString) {
             var xhr = new XMLHttpRequest();
             xhr.open("GET", "data:text/xml," + encodeURIComponent(urdfString));
-
             xhr.onreadystatechange = function () {
                 if (xhr.readyState !== XMLHttpRequest.DONE)
                     return;
-                if (xhr.status !== 200 && xhr.status !== 0) { // status 0 is for local files
+                if (xhr.status !== 200 && xhr.status !== 0) {
+                    // status 0 is for local files
                     Ros2.error("Error loading URDF XML data. Status:", xhr.status);
                     return;
                 }
@@ -329,75 +325,39 @@ Object {
                     Ros2.error("Failed to parse URDF.");
                     return;
                 }
-                let jointElements = findElementsByTagName(xmlDoc, "joint");
+                let jointElements = XmlUtils.findElementsByTagName(xmlDoc, "joint");
                 Ros2.debug("Found " + jointElements.length + " joint tags in URDF.");
                 for (let i = 0; i < jointElements.length; i++) {
                     let jointElement = jointElements[i];
-                    const type = getAttributeValue(jointElement, "type");
+                    const type = XmlUtils.getAttributeValue(jointElement, "type");
                     if (!type || type === "fixed")
                         continue;
-                    const name = getAttributeValue(jointElement, "name");
-                    const limits = getChildByTagName(jointElement, "limit");
+                    const name = XmlUtils.getAttributeValue(jointElement, "name");
+                    const limits = XmlUtils.getChildByTagName(jointElement, "limit");
                     let limitUpper = Math.PI;
                     let limitLower = -Math.PI;
                     if (limits) {
-                        limitUpper = parseFloat(getAttributeValue(limits, "upper"));
+                        limitUpper = parseFloat(XmlUtils.getAttributeValue(limits, "upper"));
                         if (isNaN(limitUpper))
                             limitUpper = Math.PI;
-                        limitLower = parseFloat(getAttributeValue(limits, "lower"));
+                        limitLower = parseFloat(XmlUtils.getAttributeValue(limits, "lower"));
                         if (isNaN(limitLower))
                             limitLower = -Math.PI;
                     }
                     Ros2.debug("Adding joint " + name + " - limits: lower=" + limitLower + ", upper=" + limitUpper);
                     d.addJoint({
-                        name: name,
-                        type: type,
-                        limits: {
-                            upper: limitUpper,
-                            lower: limitLower
-                        }
-                    });
+                            "name": name,
+                            "type": type,
+                            "limits": {
+                                "upper": limitUpper,
+                                "lower": limitLower
+                            }
+                        });
                 }
                 Ros2.debug("Found " + root.joints.count + " joints in URDF.");
                 root.hasRobotDescription = true;
             };
             xhr.send();
-        }
-
-        function findElementsByTagName(element, tagName) {
-            let result = [];
-            if (element.nodeName === tagName) {
-                result.push(element);
-            }
-
-            // Recursively check all child nodes
-            const children = element.childNodes || [];
-            for (let i = 0; i < children.length; i++) {
-                result = result.concat(findElementsByTagName(children[i], tagName));
-            }
-            return result;
-        }
-
-        function getChildByTagName(element, tagName) {
-            const children = element.childNodes || [];
-            for (let i = 0; i < children.length; i++) {
-                if (children[i].nodeName === tagName) {
-                    return children[i];
-                }
-            }
-            return null;
-        }
-
-        function getAttributeValue(element, attributeName) {
-            if (element && element.attributes) {
-                for (let i = 0; i < element.attributes.length; i++) {
-                    const attr = element.attributes[i];
-                    if (attr.nodeName === attributeName) {
-                        return attr.nodeValue;
-                    }
-                }
-            }
-            return ""; // Return empty string if not found, to match standard behavior
         }
     }
 }

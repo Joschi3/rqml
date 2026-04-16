@@ -2,7 +2,7 @@ import QtQuick.Controls
 import QtQuick.Layouts
 import RQml.Fonts
 
-RoundButton {
+Button {
     id: control
 
     property var iconFont: Qt.font({
@@ -15,11 +15,9 @@ RoundButton {
     ToolTip.delay: 500
     ToolTip.text: tooltipText
     ToolTip.visible: !!tooltipText && hovered
-    implicitWidth: Math.max(implicitHeight, _row.implicitWidth + leftPadding + rightPadding)
-    radius: 4
+    implicitWidth: Math.max(implicitHeight, contentItem.implicitWidth + leftPadding + rightPadding)
 
     contentItem: RowLayout {
-        id: _row
         spacing: 8
 
         Label {
