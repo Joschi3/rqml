@@ -355,9 +355,15 @@ Rectangle {
                 Layout.fillWidth: true
                 Layout.margins: 4
                 ToolTip.delay: 500
-                ToolTip.text: moveItInterface.isGoalActive ? "Cancel current motion" : "Plan and execute motion to goal positions"
+                ToolTip.text: {
+                    if (moveItInterface.isGoalActive)
+                        return "Cancel current motion";
+                    if (moveItInterface.activeJointCount === 0)
+                        return "Enable at least one joint to execute";
+                    return "Plan and execute motion to goal positions";
+                }
                 ToolTip.visible: hovered
-                enabled: moveItInterface.actionReady
+                enabled: moveItInterface.actionReady && (moveItInterface.isGoalActive || moveItInterface.activeJointCount > 0)
                 objectName: "moveitExecuteButton"
                 text: moveItInterface.isGoalActive ? "Cancel" : "Execute"
 

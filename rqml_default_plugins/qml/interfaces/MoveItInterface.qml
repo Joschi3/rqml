@@ -134,16 +134,15 @@ Object {
     //! Whether the MoveGroup action server is ready
     property bool actionReady: d.moveGroupClient && d.moveGroupClient.ready
 
-    // ========================================================================
-    // Public Properties
-    // ========================================================================
-
     //! The selected MoveGroup action server (e.g., "/move_action" or "/athena/fold_manager_action")
     property string actionServer: ""
 
     //! Available MoveGroup action servers discovered via Ros2.queryActions()
     property var actionServers: ListModel {
     }
+
+    //! Number of joints in the current move group with active === true
+    property int activeJointCount: 0
 
     //! Whether we have received robot description
     property bool hasRobotDescription: false
@@ -191,9 +190,6 @@ Object {
         return "Motion failed: " + (info ? info.name : "UNKNOWN_ERROR");
     }
 
-    // ========================================================================
-    // Private Functions
-    // ========================================================================
     function _getJoint(jointName) {
         for (let i = 0; i < root.joints.count; i++) {
             let joint = root.joints.get(i);
@@ -246,10 +242,6 @@ Object {
         d.updateTopics();
     }
 
-    // ========================================================================
-    // Public Functions
-    // ========================================================================
-
     /**
      * Reset all joint goals to their current positions.
      */
@@ -264,6 +256,10 @@ Object {
     function sendGoals() {
         if (!d.moveGroupClient || !d.moveGroupClient.ready) {
             Ros2.warn("MoveIt: Action server not connected");
+            return;
+        }
+        if (!root.moveGroupName) {
+            Ros2.warn("MoveIt: No move group selected");
             return;
         }
         let msg = Ros2.createEmptyActionGoal("moveit_msgs/action/MoveGroup");
@@ -289,6 +285,10 @@ Object {
                     "tolerance_below": 0.01,
                     "weight": 1.0
                 });
+        }
+        if (goalConstraints.joint_constraints.length === 0) {
+            Ros2.warn("MoveIt: No active joints to send");
+            return;
         }
         msg.request.goal_constraints.push(goalConstraints);
 
@@ -416,6 +416,13 @@ Object {
 
         onTriggered: d.updateTopics()
     }
+    Connections {
+        function onDataChanged() {
+            d._updateActiveJointCount();
+        }
+
+        target: root.joints
+    }
 
     // ========================================================================
     // Private Data
@@ -537,6 +544,7 @@ Object {
                 }
                 root.joints.insert(insertIdx, jointData);
             }
+            _updateActiveJointCount();
         }
         function _rebuildNamedPosesModel() {
             root.namedPoses.clear();
@@ -546,9 +554,16 @@ Object {
                         "name": poseNames[i]
                     });
         }
+        function _updateActiveJointCount() {
+            let count = 0;
+            for (let i = 0; i < root.joints.count; i++) {
+                if (root.joints.get(i).active)
+                    count++;
+            }
+            root.activeJointCount = count;
+        }
         function addJoint(joint) {
             allJoints[joint.name] = joint;
-            _rebuildJointsModel();
         }
         function updateTopics() {
             // Discover MoveGroup action servers
@@ -841,11 +856,7 @@ Object {
                         });
                 }
                 root.hasRobotDescription = true;
-
-                // If SRDF was already parsed, rebuild joints model now that we have the chain
-                if (root.hasSrdf) {
-                    d._rebuildJointsModel();
-                }
+                d._rebuildJointsModel();
             };
             xhr.send();
         }
