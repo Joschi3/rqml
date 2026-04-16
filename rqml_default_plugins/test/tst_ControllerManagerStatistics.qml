@@ -238,7 +238,7 @@ Item {
         function test_formatting_units_and_scale() {
             // Microsecond range
             loadWithNamespace();
-            injectValues("us_elem", [0.5, 50, 500]);
+            injectValues("us_elem", [80, 50, 500]);
             var listView = find("rsStatsListView");
             tryCompare(listView.model, "count", 1, 2000);
             var scaleMin = find("rsScaleMinLabel");

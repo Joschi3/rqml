@@ -1,102 +1,82 @@
 /*
  * BoxPlotItem.qml - Horizontal boxplot visualization component
  *
- * Displays a boxplot (min, Q1, median, Q3, max) with smooth animations.
- * Used by ControllerManagerStatistics plugin to visualize execution time distributions.
+ * Displays a boxplot (min, Q1, median, Q3, max) with smooth animations
+ * and optional formatted statistics labels below the plot.
  *
  * Usage:
  *   BoxPlotItem {
  *       minValue: 10; q1Value: 25; medianValue: 50; q3Value: 75; maxValue: 100
  *       displayMin: 0; displayMax: 120  // Shared scale across multiple plots
+ *       formatValue: function(v) { return v.toFixed(1) + " ms" }  // Optional
  *   }
  */
 import QtQuick
+import QtQuick.Controls
 import QtQuick.Controls.Material
+import QtQuick.Layouts
+import RQml.Elements
 
 Item {
     id: root
 
+    // Animated values - must live on root for Behavior bindings to work
     property real _animMax: maxValue
     property real _animMedian: medianValue
-
-    // Animated values for smooth transitions
     property real _animMin: minValue
     property real _animQ1: q1Value
     property real _animQ3: q3Value
-    readonly property int _animationDuration: 300
-
-    // Styling (can be overridden)
-    readonly property color _boxBaseColor: Material.color(Material.Blue, Material.Shade700)
-
-    //--------------------------------------------------------------------------
-    // Private Properties
-    //--------------------------------------------------------------------------
-    readonly property real _boxHeight: 18
-    readonly property real _marginH: 8
-    property color boxBorderColor: Material.color(Material.Blue, Material.Shade900)
-    property color boxColor: Qt.rgba(_boxBaseColor.r, _boxBaseColor.g, _boxBaseColor.b, 0.8)
-    property real displayMax: 100
 
     // Display range for consistent scaling across multiple boxplots
+    property real displayMax: 100
     property real displayMin: 0
-    property real maxValue: 0
-    property color medianColor: Material.color(Material.Red, Material.Shade600)
-    property real medianValue: 0
 
-    //--------------------------------------------------------------------------
-    // Public Properties
-    //--------------------------------------------------------------------------
+    // Optional value formatter callback. When set, statistics labels are shown
+    // below the plot. Signature: function(value: real) -> string
+    property var formatValue: null
+    property real maxValue: 0
+    property real medianValue: 0
 
     // Statistics values (will be animated when changed)
     property real minValue: 0
     property real q1Value: 0
     property real q3Value: 0
-    property color whiskerColor: palette.text
 
-    //--------------------------------------------------------------------------
-    // Size Hints
-    //--------------------------------------------------------------------------
-    implicitHeight: _boxHeight + 12
+    implicitHeight: d.boxHeight + 12 + (labelsRow.visible ? labelsRow.implicitHeight + 4 : 0)
     implicitWidth: 200
 
     Behavior on _animMax  {
         NumberAnimation {
-            duration: _animationDuration
+            duration: d.animationDuration
             easing.type: Easing.OutQuad
         }
     }
     Behavior on _animMedian  {
         NumberAnimation {
-            duration: _animationDuration
+            duration: d.animationDuration
             easing.type: Easing.OutQuad
         }
     }
-
-    //--------------------------------------------------------------------------
-    // Animations
-    //--------------------------------------------------------------------------
     Behavior on _animMin  {
         NumberAnimation {
-            duration: _animationDuration
+            duration: d.animationDuration
             easing.type: Easing.OutQuad
         }
     }
     Behavior on _animQ1  {
         NumberAnimation {
-            duration: _animationDuration
+            duration: d.animationDuration
             easing.type: Easing.OutQuad
         }
     }
     Behavior on _animQ3  {
         NumberAnimation {
-            duration: _animationDuration
+            duration: d.animationDuration
             easing.type: Easing.OutQuad
         }
     }
 
     onDisplayMaxChanged: canvas.requestPaint()
-
-    // Repaint when display range or size changes
     onDisplayMinChanged: canvas.requestPaint()
     onHeightChanged: canvas.requestPaint()
     onMaxValueChanged: _animMax = maxValue
@@ -106,17 +86,29 @@ Item {
     onQ3ValueChanged: _animQ3 = q3Value
     onWidthChanged: canvas.requestPaint()
 
-    //--------------------------------------------------------------------------
-    // Visual Elements
-    //--------------------------------------------------------------------------
+    QtObject {
+        id: d
+
+        readonly property int animationDuration: 300
+        readonly property color boxBaseColor: Material.color(Material.Blue, Material.Shade700)
+        readonly property color boxBorderColor: Material.color(Material.Blue, Material.Shade900)
+        readonly property color boxColor: Qt.rgba(boxBaseColor.r, boxBaseColor.g, boxBaseColor.b, 0.8)
+        readonly property real boxHeight: 18
+        readonly property color boxLabelColor: isDark ? Qt.lighter(boxBaseColor, 1.5) : Qt.darker(boxBaseColor, 1.3)
+        readonly property bool isDark: palette.window.hslLightness < 0.5
+        readonly property real marginH: 8
+        readonly property color medianColor: Material.color(Material.Red, Material.Shade600)
+        readonly property color medianLabelColor: isDark ? Qt.lighter(medianColor, 1.4) : Qt.darker(medianColor, 1.2)
+        readonly property color whiskerColor: palette.text
+    }
 
     // Background track
     Rectangle {
         anchors.left: parent.left
-        anchors.leftMargin: _marginH
+        anchors.leftMargin: d.marginH
         anchors.right: parent.right
-        anchors.rightMargin: _marginH
-        anchors.verticalCenter: parent.verticalCenter
+        anchors.rightMargin: d.marginH
+        anchors.verticalCenter: canvas.verticalCenter
         color: palette.mid
         height: 2
         opacity: 0.3
@@ -126,9 +118,12 @@ Item {
     // Boxplot canvas
     Canvas {
         id: canvas
-        anchors.fill: parent
-        anchors.leftMargin: _marginH
-        anchors.rightMargin: _marginH
+        anchors.left: parent.left
+        anchors.leftMargin: d.marginH
+        anchors.right: parent.right
+        anchors.rightMargin: d.marginH
+        anchors.top: parent.top
+        height: d.boxHeight + 12
 
         onPaint: {
             const ctx = getContext("2d");
@@ -140,9 +135,7 @@ Item {
                 return;
             const drawWidth = width;
             const centerY = height / 2;
-            const halfBox = root._boxHeight / 2;
-
-            // Map value to x coordinate, clamped to drawable area
+            const halfBox = d.boxHeight / 2;
             function mapX(val) {
                 const normalized = (val - root.displayMin) / range;
                 return Math.max(1, Math.min(normalized * drawWidth, drawWidth - 1));
@@ -154,7 +147,7 @@ Item {
             const maxX = mapX(root._animMax);
 
             // Whisker lines
-            ctx.strokeStyle = root.whiskerColor;
+            ctx.strokeStyle = d.whiskerColor;
             ctx.lineWidth = 1.5;
             ctx.lineCap = "round";
             ctx.beginPath();
@@ -176,16 +169,16 @@ Item {
             // Box (Q1 to Q3)
             const boxWidth = Math.max(q3X - q1X, 4);
             const boxRadius = 3;
-            ctx.fillStyle = root.boxColor;
+            ctx.fillStyle = d.boxColor;
             ctx.beginPath();
-            ctx.roundedRect(q1X, centerY - halfBox, boxWidth, root._boxHeight, boxRadius, boxRadius);
+            ctx.roundedRect(q1X, centerY - halfBox, boxWidth, d.boxHeight, boxRadius, boxRadius);
             ctx.fill();
-            ctx.strokeStyle = root.boxBorderColor;
+            ctx.strokeStyle = d.boxBorderColor;
             ctx.lineWidth = 1.5;
             ctx.stroke();
 
             // Median line
-            ctx.strokeStyle = root.medianColor;
+            ctx.strokeStyle = d.medianColor;
             ctx.lineWidth = 2.5;
             ctx.beginPath();
             ctx.moveTo(medX, centerY - halfBox + 2);
@@ -194,11 +187,46 @@ Item {
         }
     }
 
-    //--------------------------------------------------------------------------
-    // Repaint Triggers
-    //--------------------------------------------------------------------------
+    // Statistics labels
+    RowLayout {
+        id: labelsRow
+        anchors.left: parent.left
+        anchors.leftMargin: d.marginH
+        anchors.right: parent.right
+        anchors.rightMargin: d.marginH
+        anchors.top: canvas.bottom
+        spacing: 6
+        visible: !!root.formatValue
 
-    // Repaint when animated values change (for smooth animation)
+        Caption {
+            Layout.preferredWidth: 90
+            text: root.formatValue ? "min " + root.formatValue(root.minValue) : ""
+        }
+        Caption {
+            Layout.preferredWidth: 90
+            color: d.boxLabelColor
+            text: root.formatValue ? "Q1 " + root.formatValue(root.q1Value) : ""
+        }
+        Caption {
+            Layout.preferredWidth: 90
+            color: d.medianLabelColor
+            font.bold: true
+            text: root.formatValue ? "med " + root.formatValue(root.medianValue) : ""
+        }
+        Caption {
+            Layout.preferredWidth: 90
+            color: d.boxLabelColor
+            text: root.formatValue ? "Q3 " + root.formatValue(root.q3Value) : ""
+        }
+        Caption {
+            text: root.formatValue ? "max " + root.formatValue(root.maxValue) : ""
+        }
+        Item {
+            Layout.fillWidth: true
+        }
+    }
+
+    // Repaint when animated values change
     Connections {
         function on_AnimMaxChanged() {
             canvas.requestPaint();

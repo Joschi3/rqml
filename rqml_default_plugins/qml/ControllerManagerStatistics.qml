@@ -143,7 +143,18 @@ Rectangle {
             }
             Rectangle {
                 Layout.fillWidth: true
-                color: palette.mid
+                Layout.margins: 8
+                color: palette.text
+                height: 1
+                opacity: 0.3
+            }
+            Caption {
+                text: "Scale"
+            }
+            Rectangle {
+                Layout.fillWidth: true
+                Layout.margins: 8
+                color: palette.text
                 height: 1
                 opacity: 0.3
             }
@@ -210,51 +221,17 @@ Rectangle {
                         }
                     }
 
-                    // Boxplot visualization
+                    // Boxplot visualization with statistics labels
                     BoxPlotItem {
-                        id: boxPlot
                         Layout.fillWidth: true
-                        Layout.preferredHeight: 22
                         displayMax: d.globalMax
                         displayMin: d.globalMin
+                        formatValue: d.formatTime
                         maxValue: model.max
                         medianValue: model.median
                         minValue: model.min
                         q1Value: model.q1
                         q3Value: model.q3
-                    }
-
-                    // Statistics values
-                    RowLayout {
-                        Layout.fillWidth: true
-                        spacing: 6
-
-                        Caption {
-                            Layout.preferredWidth: 90
-                            text: "min " + d.formatTime(model.min)
-                        }
-                        Caption {
-                            Layout.preferredWidth: 90
-                            color: boxPlot.boxBorderColor
-                            text: "Q1 " + d.formatTime(model.q1)
-                        }
-                        Caption {
-                            Layout.preferredWidth: 90
-                            color: boxPlot.medianColor
-                            font.bold: true
-                            text: "med " + d.formatTime(model.median)
-                        }
-                        Caption {
-                            Layout.preferredWidth: 90
-                            color: boxPlot.boxBorderColor
-                            text: "Q3 " + d.formatTime(model.q3)
-                        }
-                        Caption {
-                            text: "max " + d.formatTime(model.max)
-                        }
-                        Item {
-                            Layout.fillWidth: true
-                        }
                     }
                 }
             }
@@ -439,6 +416,8 @@ Rectangle {
          * with appropriate unit (us or ms).
          */
         function formatTime(us) {
+            if (us == 0)
+                return 0;
             if (us >= 1000)
                 return (us / 1000).toFixed(2) + " ms";
             if (us >= 1)
@@ -608,6 +587,16 @@ Rectangle {
                 const halfRange = range > 0 ? (range * 0.55) : Math.max(Math.abs(center) * 0.05, 0.5);
                 globalMin = Math.max(0, center - halfRange);
                 globalMax = center + halfRange;
+                if (globalMax < 100)
+                    globalMax = Math.ceil(globalMax / 5) * 5;
+                else if (globalMax < 1000)
+                    globalMax = Math.ceil(globalMax / 20) * 20;
+                else if (globalMax < 10000)
+                    globalMax = Math.ceil(globalMax / 100) * 100;
+                else if (globalMax < 100000)
+                    globalMax = Math.ceil(globalMax / 1000) * 1000;
+                else if (globalMax < 1000000)
+                    globalMax = Math.ceil(globalMax / 10000) * 10000;
             }
 
             // Re-sort alphabetically only when element count changes
