@@ -235,12 +235,6 @@ Rectangle {
                     }
                 }
             }
-
-            // Disable list animations to prevent flickering during updates
-            displaced: Transition {
-            }
-            remove: Transition {
-            }
         }
 
         // Empty state message
@@ -429,7 +423,7 @@ Rectangle {
          * Processes incoming statistics message and accumulates samples.
          */
         function processMessage(msg) {
-            if (!msg)
+            if (!msg || !(context.enabled ?? true))
                 return;
             const statistics = msg.statistics;
             if (!statistics || statistics.length === undefined)

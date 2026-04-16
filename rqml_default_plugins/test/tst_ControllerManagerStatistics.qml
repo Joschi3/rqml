@@ -109,6 +109,22 @@ Item {
                     return find("rsStatisticsSubscription") !== null;
                 }, 2000, "Statistics subscription should be created");
         }
+
+        //! Count currently rendered stats delegates in the ListView content item.
+        function renderedStatsDelegateCount() {
+            var listView = find("rsStatsListView");
+            verify(listView !== null, "Stats ListView should exist");
+            var contentItem = listView.contentItem;
+            verify(contentItem !== null, "ListView contentItem should exist");
+            var count = 0;
+            var children = contentItem.children;
+            for (var i = 0; i < children.length; i++) {
+                var child = children[i];
+                if (child && child.objectName === "rsStatsDelegate" && child.visible)
+                    count++;
+            }
+            return count;
+        }
         function test_boxplot_statistics() {
             loadWithNamespace();
 
@@ -169,7 +185,8 @@ Item {
             compare(listView.model.get(0).label, "only_one", "The single element should be the newly published one");
         }
         function test_clear_when_paused() {
-            // Reproduces bug: after clearing when paused, some bars remain visible
+            // Reproduces bug: after pause + clear, stale chart delegates could
+            // remain visible.
             loadWithNamespace();
 
             // Inject limited data (1 message, few elements)
@@ -193,9 +210,16 @@ Item {
             mouseClick(clearBtn);
             tryCompare(listView.model, "count", 0, 2000, "Model should be empty after clear while paused");
 
+            // Simulate a late message while paused; it should be ignored.
+            injectStats([{
+                        "name": "ctrl_late.stats/execution_time/current_value",
+                        "value": 55
+                    }]);
+
             // Wait longer than update timer + animation duration and verify stays empty
             wait(1500);
             compare(listView.model.count, 0, "Model should remain empty with no new messages arriving");
+            compare(renderedStatsDelegateCount(), 0, "No stats delegates should remain rendered after clear");
 
             // Also verify the elements label
             var elementsLabel = find("rsElementsLabel");
@@ -376,9 +400,8 @@ Item {
             var sub = find("rsStatisticsSubscription");
             verify(!sub.enabled, "Subscription should be disabled when paused");
 
-            // Data injected while paused still reaches the handler (mock limitation),
-            // but the subscription.enabled binding proves no real messages would arrive.
-            // Verify existing data is preserved while paused.
+            // Data injected while paused should be ignored.
+            injectValues("paused_ignored", [999]);
             compare(listView.model.count, 1, "Existing data should be preserved while paused");
 
             // Resume
