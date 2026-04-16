@@ -22,6 +22,8 @@ import QtQuick.Layouts
 import com.kdab.dockwidgets 2.0 as KDDW
 import Ros2
 import QtQml.Models
+import RQml.Elements
+import "UsageHints.js" as UsageHints
 import "."
 
 ApplicationWindow {
@@ -33,6 +35,7 @@ ApplicationWindow {
     minimumHeight: 320
     title: "RQml" + (RQml.devMode ? " [DEV MODE]" : "")
     color: active ? palette.active.window : palette.inactive.window
+    property string currentShortcutHint: UsageHints.getHint("")
 
     Component.onCompleted: {
         if (!Ros2.isInitialized()) {
@@ -88,6 +91,14 @@ ApplicationWindow {
             }
 
             Action {
+                text: qsTr("Close focused plugin")
+                shortcut: "Ctrl+W"
+                onTriggered: {
+                    RQml.closeFocusedPlugin();
+                }
+            }
+
+            Action {
                 text: qsTr("Close All")
                 onTriggered: {
                     KDDW.Singletons.dockRegistry.clear();
@@ -116,6 +127,17 @@ ApplicationWindow {
         Menu {
             id: pluginsMenu
             title: qsTr("&Plugins")
+
+            Action {
+                text: qsTr("Search plugins…")
+                shortcut: "Ctrl+P"
+                onTriggered: {
+                    openPluginDialog.openAndFocus();
+                }
+            }
+
+            MenuSeparator {}
+
             Instantiator {
                 model: {
                     let groups = new Set();
@@ -126,8 +148,8 @@ ApplicationWindow {
                     });
                     return Array.from(groups);
                 }
-                onObjectAdded: (index, object) => pluginsMenu.insertMenu(index, object)
-                onObjectRemoved: (index, object) => pluginsMenu.removeMenu(index, object)
+                onObjectAdded: (index, object) => pluginsMenu.insertMenu(index + 2, object)
+                onObjectRemoved: (index, object) => pluginsMenu.removeMenu(index + 2, object)
 
                 Menu {
                     title: modelData
@@ -139,7 +161,7 @@ ApplicationWindow {
                                 let instance = RQml.createPlugin(modelData.id);
                                 if (!instance)
                                     return;
-                                root.addDockWidget(instance, KDDW.KDDockWidgets.Location_OnRight);
+                                rootDockingArea.addDockWidget(instance, KDDW.KDDockWidgets.Location_OnRight);
                             }
                         }
                     }
@@ -153,7 +175,7 @@ ApplicationWindow {
                         let instance = RQml.createPlugin(modelData.id);
                         if (!instance)
                             return;
-                        root.addDockWidget(instance, KDDW.KDDockWidgets.Location_OnRight);
+                        rootDockingArea.addDockWidget(instance, KDDW.KDDockWidgets.Location_OnRight);
                     }
                 }
             }
@@ -187,6 +209,7 @@ ApplicationWindow {
     }
 
     Row {
+        id: noPluginsLoadedRow
         anchors.centerIn: parent
         spacing: -Qt.application.font.pixelSize * 2
 
@@ -213,9 +236,25 @@ ApplicationWindow {
             mipmap: true
         }
     }
+    Hint {
+        anchors.horizontalCenter: noPluginsLoadedRow.horizontalCenter
+        anchors.top: noPluginsLoadedRow.bottom
+        anchors.topMargin: 32
+        width: Math.min(implicitWidth, noPluginsLoadedRow.width)
+        text: qsTr("Hint: %1").arg(mainWindow.currentShortcutHint)
+    }
+
+    Timer {
+        interval: 30000
+        repeat: true
+        running: true
+        onTriggered: {
+            mainWindow.currentShortcutHint = UsageHints.getHint(mainWindow.currentShortcutHint);
+        }
+    }
 
     KDDW.DockingArea {
-        id: root
+        id: rootDockingArea
         anchors.fill: parent
         // Each main layout needs a unique id
         uniqueName: "MainLayout-1"
@@ -231,6 +270,10 @@ ApplicationWindow {
 
     OpenConfigDialog {
         id: openConfigDialog
+    }
+
+    OpenPluginDialog {
+        id: openPluginDialog
     }
 
     SaveConfigDialog {

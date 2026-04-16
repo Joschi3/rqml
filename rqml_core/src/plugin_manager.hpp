@@ -54,6 +54,8 @@ public:
 
   KDDockWidgets::QtQuick::DockWidget *createPlugin( const QString &plugin_id );
 
+  bool canCreatePlugin( const QString &plugin_id ) const;
+
   KDDockWidgets::Core::DockWidget *factoryFn( const QString &name );
 
   static QString extractPluginId( const QString &unique_name )

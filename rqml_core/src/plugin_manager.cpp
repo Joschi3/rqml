@@ -29,6 +29,7 @@
 #include <QQmlContext>
 #include <QQmlEngine>
 #include <QtCore>
+#include <algorithm>
 #include <ament_index_cpp/get_resource.hpp>
 #include <ament_index_cpp/get_resources.hpp>
 #include <filesystem>
@@ -72,6 +73,22 @@ PluginManager::PluginManager( QQmlEngine *engine ) : engine_( engine )
     qDebug() << "Loading plugins from" << name.c_str() << "at" << path.c_str();
     loadPluginsFromResource( name, path );
   }
+  std::sort( plugins_.begin(), plugins_.end(), []( const RQmlPlugin &lhs, const RQmlPlugin &rhs ) {
+    const bool lhs_ungrouped = lhs.group_.isEmpty();
+    const bool rhs_ungrouped = rhs.group_.isEmpty();
+    if ( lhs_ungrouped != rhs_ungrouped )
+      return lhs_ungrouped;
+
+    const int group_cmp = QString::compare( lhs.group_, rhs.group_, Qt::CaseInsensitive );
+    if ( group_cmp != 0 )
+      return group_cmp < 0;
+
+    const int name_cmp = QString::compare( lhs.name_, rhs.name_, Qt::CaseInsensitive );
+    if ( name_cmp != 0 )
+      return name_cmp < 0;
+
+    return QString::compare( lhs.id_, rhs.id_, Qt::CaseInsensitive ) < 0;
+  } );
 
   connect( &changed_check_timer_, &QTimer::timeout, this, &PluginManager::checkForChanges );
   changed_check_timer_.setInterval( 1000 );
@@ -162,6 +179,29 @@ KDDockWidgets::QtQuick::DockWidget *PluginManager::createPlugin( const QString &
   dw->setGuestItem( "file://" + it_plugin->path_, context );
   dw->open();
   return dw;
+}
+
+bool PluginManager::canCreatePlugin( const QString &plugin_id ) const
+{
+  auto it_plugin =
+      std::find_if( plugins_.begin(), plugins_.end(),
+                    [&plugin_id]( const RQmlPlugin &plugin ) { return plugin.id_ == plugin_id; } );
+  if ( it_plugin == plugins_.end() )
+    return false;
+
+  if ( !it_plugin->single_instance_ )
+    return true;
+
+  auto it_instance =
+      std::find_if( instances_.begin(), instances_.end(), [&plugin_id]( const auto &pair ) {
+        return extractPluginId( pair.first ) == plugin_id.toStdString();
+      } );
+  if ( it_instance == instances_.end() )
+    return true;
+
+  auto *widget =
+      KDDockWidgets::DockRegistry::self()->dockByName( QString::fromStdString( it_instance->first ) );
+  return !( widget && widget->isOpen() );
 }
 
 std::vector<RQmlPlugin>::const_iterator PluginManager::findPluginById( const QString &plugin_id )

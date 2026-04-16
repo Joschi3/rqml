@@ -21,13 +21,16 @@
 #include <filesystem>
 
 #include <QClipboard>
+#include <QCursor>
 #include <QFile>
 #include <QGuiApplication>
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
+#include <QQuickItem>
 #include <QStandardPaths>
 
 #include <kddockwidgets/Config.h>
+#include <kddockwidgets/core/DockRegistry.h>
 #include <kddockwidgets/qtquick/Platform.h>
 #include <kddockwidgets/qtquick/views/DockWidget.h>
 
@@ -87,6 +90,42 @@ public:
     return plugin_loader_->createPlugin( plugin_id );
   }
 
+  bool canCreatePlugin( const QString &plugin_id ) const
+  {
+    return plugin_loader_->canCreatePlugin( plugin_id );
+  }
+
+  void closeFocusedPlugin()
+  {
+    auto *dock_under_cursor = static_cast<KDDockWidgets::Core::DockWidget *>( nullptr );
+    const QPoint global_pos = QCursor::pos();
+    for ( auto *dock_widget : KDDockWidgets::DockRegistry::self()->dockwidgets() ) {
+      if ( dock_widget == nullptr || !dock_widget->isOpen() || !dock_widget->isCurrentTab() )
+        continue;
+
+      auto *dock_item = KDDockWidgets::QtQuick::asQQuickItem( dock_widget );
+      if ( dock_item == nullptr )
+        continue;
+
+      const QPointF local_pos = dock_item->mapFromGlobal( global_pos );
+      if ( dock_item->contains( local_pos ) ) {
+        dock_under_cursor = dock_widget;
+        break;
+      }
+    }
+
+    auto *focused_widget = KDDockWidgets::DockRegistry::self()->focusedDockWidget();
+    if ( focused_widget == nullptr || !focused_widget->isOpen() )
+      return;
+
+    // Safety-first behavior since sometimes focus is not updated correctly:
+    // If cursor is currently not over the focused one, do nothing.
+    if ( dock_under_cursor != focused_widget )
+      return;
+
+    focused_widget->close();
+  }
+
   void save() { config_manager_->save(); }
   void save( const QString &path ) { config_manager_->save( path.toStdString() ); }
   void load( const QString &path ) { config_manager_->load( path.toStdString() ); }
@@ -127,6 +166,13 @@ public:
   {
     return RQml::instance().createPlugin( plugin_id );
   }
+
+  Q_INVOKABLE bool canCreatePlugin( const QString &plugin_id ) const
+  {
+    return RQml::instance().canCreatePlugin( plugin_id );
+  }
+
+  Q_INVOKABLE void closeFocusedPlugin() { RQml::instance().closeFocusedPlugin(); }
 
   Q_INVOKABLE void save( const QString &path ) { return RQml::instance().save( path ); }
 
