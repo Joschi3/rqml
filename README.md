@@ -5,9 +5,9 @@
 
 ![image](docs/images/header_image.png)
 
-**RQml** is your modern, QML-based robotics visualization and control toolbox for ROS 2! 🚀
+**RQml** is your modern, QML-based robotics debugging, introspection and control toolbox for ROS 2! 🚀
 
-It provides a flexible, plugin-based architecture that empowers you to create custom dashboards and control interfaces for your robots, leveraging the full power of Qt 6 and QML. ✨
+It provides a flexible, plugin-based architecture that empowers you to create your own custom plugins and control interfaces to inspect and debug your robotics applications, leveraging the full power of Qt 6 and QML. ✨
 
 Built with [KDAB's KDDockWidgets](https://github.com/KDAB/KDDockWidgets), RQml offers a highly customizable docking interface, letting you arrange your workspace exactly how *you* like it. 🎨
 
@@ -20,7 +20,7 @@ Alternatively, donations are always welcome :)
 
 ## ✨ Features
 
-* 🔗 **ROS 2 Integration**: Seamlessly connects with the ROS 2 ecosystem.
+* 🔗 **ROS 2 Integration**: Seamlessly connects with the ROS 2 ecosystem using the [QML6 ROS2 Plugin](https://github.com/StefanFabian/qml6_ros2_plugin).
 * 🖥️ **Modern UI**: Built on Qt 6 and QML for fluid, high-performance user interfaces.
 * 🧩 **Plugin System**: Extensible architecture for easily adding new tools and widgets.
 * 🪟 **Docking Interface**: Flexible layout management with KDDockWidgets.
@@ -66,12 +66,16 @@ The `rqml_default_plugins` package includes these awesome tools:
 * **ActionCaller**: Interface for calling ROS 2 Actions.
 * **Console**: A log viewer for ROS 2 messages.
 * **ControllerManager**: Manage and switch ROS 2 controllers.
+* **ControllerManagerStatistics**: Inspect statistics from ROS 2 controllers.
 * **ImageView**: View camera streams and images.
 * **JointTrajectoryController**: Interface for sending joint trajectory commands.
 * **MessagePublisher**: Publish custom ROS 2 messages.
+* **MoveItController**: Execute robot motions via MoveIt.
 * **ParameterEditor**: Discover, view, and dynamically reconfigure ROS 2 node parameters.
 * **RobotSteering**: Teleoperation tool for mobile robots.
 * **ServiceCaller**: Interface for calling ROS 2 Services.
+* **TfTreeViewer**: Visualize and search the TF frame tree.
+* **TopicMonitor**: Monitor topic activity and bandwidth.
 
 ## 🧩 Creating your own plugin
 
