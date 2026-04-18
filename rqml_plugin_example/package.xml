@@ -2,7 +2,7 @@
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
   <name>rqml_plugin_example</name>
-  <version>3.26.40</version>
+  <version>3.26.41</version>
   <description>An example plugin for RQml</description>
   <!-- Replace with your email and name -->
   <maintainer email="fabian@sim.tu-darmstadt.de">Stefan Fabian</maintainer>
