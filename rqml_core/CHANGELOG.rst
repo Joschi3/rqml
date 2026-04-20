@@ -2,8 +2,8 @@
 Changelog for package rqml_core
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Forthcoming
------------
+3.26.42 (2026-04-20)
+--------------------
 * Adding KDDockWidgets as third_party to the repo until better option is viable (e.g. vendor package).
 * Contributors: Stefan Fabian
 

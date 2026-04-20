@@ -2,7 +2,7 @@
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
   <name>rqml_default_plugins</name>
-  <version>3.26.41</version>
+  <version>3.26.42</version>
   <description>Default plugins for the QML-based robotics visualization and control tool RQml for ROS 2.</description>
   <maintainer email="fabian@sim.tu-darmstadt.de">Stefan Fabian</maintainer>
   <license>GPL-3.0-only</license>

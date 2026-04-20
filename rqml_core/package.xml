@@ -2,7 +2,7 @@
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
   <name>rqml_core</name>
-  <version>3.26.41</version>
+  <version>3.26.42</version>
   <description>QML-based robotics visualization and control tool for ROS 2.</description>
 
   <maintainer email="fabian@sim.tu-darmstadt.de">Stefan Fabian</maintainer>
