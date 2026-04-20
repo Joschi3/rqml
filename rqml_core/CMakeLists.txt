@@ -21,6 +21,12 @@ qt6_add_resources(
   QML_RESOURCES ${CMAKE_CURRENT_SOURCE_DIR}/qml.qrc) # Use absolute path
 set(CMAKE_AUTOMOC ON)
 
+set(KDDockWidgets_SOURCE_DIR
+  ${CMAKE_CURRENT_SOURCE_DIR}/third_party/KDDockWidgets)
+if (NOT EXISTS ${KDDockWidgets_SOURCE_DIR}/CMakeLists.txt)
+  message(FATAL_ERROR "Vendored KDDockWidgets sources not found in ${KDDockWidgets_SOURCE_DIR}")
+endif ()
+
 set(KDDockWidgets_QT6
   ON
   CACHE BOOL "Use Qt6 for KDDockWidgets")
@@ -30,14 +36,20 @@ set(KDDockWidgets_FRONTENDS
 set(KDDockWidgets_EXAMPLES
   OFF
   CACHE BOOL "Build KDDockWidgets examples")
+set(KDDockWidgets_TESTS
+  OFF
+  CACHE BOOL "Build KDDockWidgets tests")
+set(KDDockWidgets_DOCS
+  OFF
+  CACHE BOOL "Build KDDockWidgets docs")
+set(KDDockWidgets_PYTHON_BINDINGS
+  OFF
+  CACHE BOOL "Build KDDockWidgets Python bindings")
+set(KDDockWidgets_DEVELOPER_MODE
+  OFF
+  CACHE BOOL "Enable KDDockWidgets developer mode")
 
-include(FetchContent)
-FetchContent_Declare(
-  KDDockWidgets
-  GIT_REPOSITORY https://github.com/KDAB/KDDockWidgets.git
-  GIT_TAG v2.3.0
-  SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/third_party/KDDockWidgets)
-FetchContent_MakeAvailable(KDDockWidgets)
+add_subdirectory(${KDDockWidgets_SOURCE_DIR} third_party/KDDockWidgets)
 
 set(HEADERS src/rqml_plugin.h)
 
