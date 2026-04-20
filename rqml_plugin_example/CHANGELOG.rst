@@ -2,6 +2,9 @@
 Changelog for package rqml_plugin_example
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+Forthcoming
+-----------
+
 3.26.41 (2026-04-18)
 --------------------
 
