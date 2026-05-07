@@ -235,8 +235,8 @@ Rectangle {
                     width: monitorListView.width
 
                     Component.onCompleted: {
-                        displayedFrequency = topicSubscription.frequency;
-                        displayedBandwidth = topicSubscription.bandwidth;
+                        displayedFrequency = topicSubscription.frequency ?? 0;
+                        displayedBandwidth = topicSubscription.bandwidth ?? 0;
                         root.syncResolvedType(model.index, resolvedType || topicSubscription.messageType);
                     }
 
@@ -343,8 +343,8 @@ Rectangle {
                         running: !model.paused
 
                         onTriggered: {
-                            delegateRoot.displayedFrequency = topicSubscription.frequency;
-                            delegateRoot.displayedBandwidth = topicSubscription.bandwidth;
+                            delegateRoot.displayedFrequency = topicSubscription.frequency ?? 0;
+                            delegateRoot.displayedBandwidth = topicSubscription.bandwidth ?? 0;
                         }
                     }
                 }
