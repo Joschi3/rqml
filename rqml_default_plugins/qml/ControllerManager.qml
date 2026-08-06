@@ -3,6 +3,7 @@ import QtQuick.Controls
 import QtQuick.Layouts
 import Ros2
 import RQml.Elements
+import RQml.Fonts
 import "elements"
 import "interfaces"
 
@@ -27,13 +28,19 @@ Rectangle {
     Component.onCompleted: {
         if (context.enabled === undefined)
             context.enabled = true;
+        if (context.switch_strictness === undefined)
+            context.switch_strictness = ControllerManagerInterface.Strictness.Auto;
+        if (context.activate_asap === undefined)
+            context.activate_asap = false;
+        if (context.switch_timeout === undefined)
+            context.switch_timeout = 0;
         d.refresh();
     }
 
     GridLayout {
         anchors.fill: parent
         anchors.margins: 4
-        columns: 3
+        columns: 4
 
         Label {
             text: "Controller Manager"
@@ -59,9 +66,16 @@ Rectangle {
                 animate = false;
             }
         }
+        IconButton {
+            objectName: "cmSettingsButton"
+            text: IconFont.iconSettings
+            tooltipText: qsTr("Settings")
+
+            onClicked: settingsDialog.open()
+        }
         LoadingListView {
             id: controllerListView
-            Layout.columnSpan: 3
+            Layout.columnSpan: 4
             Layout.fillHeight: true
             Layout.fillWidth: true
             Layout.preferredHeight: 240
@@ -159,7 +173,7 @@ Rectangle {
         }
         LoadingListView {
             id: hardwareComponentsListView
-            Layout.columnSpan: 3
+            Layout.columnSpan: 4
             Layout.fillHeight: true
             Layout.fillWidth: true
             Layout.preferredHeight: 120
@@ -267,11 +281,19 @@ Rectangle {
         id: hardwareComponentInfoDialog
         objectName: "cmHardwareComponentInfoDialog"
     }
+    ControllerManagerSettingsDialog {
+        id: settingsDialog
+        objectName: "cmSettingsDialog"
+        settings: context
+    }
     QtObject {
         id: d
 
         property var controllerManager: ControllerManagerInterface {
+            activateAsap: context.activate_asap ?? false
             controllerManager: context.controller_manager_namespace || ""
+            strictness: context.switch_strictness ?? ControllerManagerInterface.Strictness.Auto
+            switchTimeout: context.switch_timeout ?? 0
         }
         property var controllerManagers: []
         property var trajectoryClient: null

@@ -6,12 +6,28 @@ import RQml.Utils
 Object {
     id: root
 
+    // Mirrors the constants of controller_manager_msgs/srv/SwitchController.
+    enum Strictness {
+        BestEffort = 1,
+        Strict,
+        Auto,
+        ForceAuto
+    }
+
+    // Activate controllers as soon as their hardware dependencies are ready
+    // instead of waiting for all interfaces.
+    property bool activateAsap: false
     property string controllerManager
     property var controllers: ListModel {
     }
     property var hardwareComponents: ListModel {
     }
     readonly property bool loading: d.loadingControllers || d.loadingHardwareComponents
+    // Strictness used for activate/deactivate, see the Strictness enum.
+    property int strictness: ControllerManagerInterface.Strictness.Auto
+    // Timeout in seconds before pending controllers are aborted. Zero makes the
+    // controller manager fall back to its default of 1 s.
+    property real switchTimeout: 0
 
     function addParameterControllers() {
         if (!root.controllerManager)
@@ -149,7 +165,9 @@ Object {
             request = {
                 "activate_controllers": action == "activate" ? [controllerName] : [],
                 "deactivate_controllers": action == "deactivate" ? [controllerName] : [],
-                "strictness": 3
+                "strictness": root.strictness,
+                "activate_asap": root.activateAsap,
+                "timeout": d.secondsToDuration(root.switchTimeout)
             };
         } else {
             request.name = controllerName;
@@ -233,6 +251,21 @@ Object {
         property bool loadingHardwareComponents: false
         property var parametersServiceClient: null
         property var setComponentStateServiceClient: null
+
+        function secondsToDuration(seconds) {
+            const clamped = Math.max(0, seconds);
+            let sec = Math.floor(clamped);
+            let nanosec = Math.round((clamped - sec) * 1e9);
+            // Rounding may push the fraction to a full second.
+            if (nanosec >= 1e9) {
+                sec += 1;
+                nanosec -= 1e9;
+            }
+            return {
+                "sec": sec,
+                "nanosec": nanosec
+            };
+        }
     }
     Subscription {
         id: activitySub

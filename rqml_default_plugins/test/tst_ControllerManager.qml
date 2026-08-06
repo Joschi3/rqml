@@ -31,11 +31,16 @@ Item {
     height: 768
     width: 1024
 
+    // Mimics the real plugin context: keys the plugin has not initialized yet
+    // are undefined, so the default initialization is exercised as well.
     QtObject {
         id: contextObj
 
+        property var activate_asap: undefined
         property string controller_manager_namespace: ""
         property bool enabled: true
+        property var switch_strictness: undefined
+        property var switch_timeout: undefined
     }
     Utils {
         id: helpers
@@ -56,10 +61,26 @@ Item {
         readonly property int stateActive: 3
         readonly property int stateInactive: 2
         readonly property int stateUnconfigured: 1
+        // Constants of controller_manager_msgs/srv/SwitchController.
+        readonly property int strictnessAuto: 3
+        readonly property int strictnessBestEffort: 1
+        readonly property int strictnessForceAuto: 4
+        readonly property int strictnessStrict: 2
 
+        // Returns the index of the entry with the given strictness value or -1.
+        function indexOfStrictness(comboBox, value) {
+            for (var i = 0; i < comboBox.count; ++i) {
+                if (comboBox.valueAt(i) === value)
+                    return i;
+            }
+            return -1;
+        }
         function init() {
             Ros2.reset();
             contextObj.controller_manager_namespace = "";
+            contextObj.switch_strictness = undefined;
+            contextObj.activate_asap = undefined;
+            contextObj.switch_timeout = undefined;
 
             // Register services for multiple namespaces to test selection
             var handler = function (req) {
@@ -106,6 +127,26 @@ Item {
             }
             return null;
         }
+        function openSettingsDialog() {
+            var settingsButton = find("cmSettingsButton");
+            verify(settingsButton, "Settings button should be found");
+            mouseClick(settingsButton);
+            var dialog = find("cmSettingsDialog");
+            verify(dialog, "Settings dialog should be found");
+            tryVerify(function () {
+                    return dialog.visible;
+                }, 2000, "Settings dialog should open");
+            return dialog;
+        }
+        function test_context_defaults() {
+            // The plugin has to persist its defaults into the context so that
+            // they end up in the saved configuration.
+            tryCompare(contextObj, "switch_strictness", strictnessAuto, 2000, "switch_strictness should be initialized to AUTO");
+            tryCompare(contextObj, "activate_asap", false, 2000, "activate_asap should be initialized to false");
+            tryCompare(contextObj, "switch_timeout", 0, 2000, "switch_timeout should be initialized to zero");
+            verify(contextObj.activate_asap !== undefined, "activate_asap must be defined, not just falsy");
+            verify(contextObj.switch_timeout !== undefined, "switch_timeout must be defined, not just falsy");
+        }
         function test_controller_transitions() {
             // Record the requests hitting switch_controller so we can assert
             // on the exact payload sent.
@@ -132,7 +173,11 @@ Item {
             var req = switchRequests[0];
             compare(req.deactivate_controllers, ["joint_state_broadcaster"]);
             compare(req.activate_controllers, []);
-            compare(req.strictness, 3);
+            // Defaults applied by the plugin when the context is still empty.
+            compare(req.strictness, strictnessAuto);
+            compare(req.activate_asap, false);
+            compare(req.timeout.sec, 0);
+            compare(req.timeout.nanosec, 0);
 
             // Now activate - the client should be reused for the same service
             // name and a second request should be recorded.
@@ -293,6 +338,155 @@ Item {
             var names = [list.model.get(0).name, list.model.get(1).name];
             verify(names.indexOf("joint_state_broadcaster") !== -1);
             verify(names.indexOf("arm_controller") !== -1);
+        }
+        function test_settings_applied_to_switch_request() {
+            var switchRequests = [];
+            Ros2.registerService("/mock_cm/switch_controller", "controller_manager_msgs/srv/SwitchController", function (req) {
+                    switchRequests.push(req);
+                    var resp = Ros2.createEmptyServiceResponse("controller_manager_msgs/srv/SwitchController");
+                    resp.ok = true;
+                    return resp;
+                });
+            contextObj.controller_manager_namespace = "/mock_cm";
+            var list = find("cmControllerList");
+            tryVerify(function () {
+                    return list.count >= 1;
+                }, 5000);
+
+            // Change the settings the way a user would, then check that the
+            // switch_controller request actually carries them.
+            var dialog = openSettingsDialog();
+            var strictnessComboBox = find("cmSettingsStrictnessComboBox");
+            strictnessComboBox.currentIndex = indexOfStrictness(strictnessComboBox, strictnessForceAuto);
+            mouseClick(find("cmSettingsActivateAsapCheckBox"));
+            find("cmSettingsTimeoutSpinBox").value = 2.5;
+            dialog.close();
+            tryVerify(function () {
+                    return !dialog.visible;
+                }, 2000);
+            plugin.controllerManagerInterface.transitionController("joint_state_broadcaster", ["activate"]);
+            tryVerify(function () {
+                    return switchRequests.length === 1;
+                }, 2000);
+            var req = switchRequests[0];
+            compare(req.strictness, strictnessForceAuto, "Selected strictness should reach the service");
+            compare(req.activate_asap, true, "Activate ASAP should reach the service");
+            compare(req.timeout.sec, 2, "Timeout seconds should reach the service");
+            compare(req.timeout.nanosec, 500000000, "Timeout nanoseconds should reach the service");
+
+            // Settings only apply to switch_controller, not to the other
+            // lifecycle services.
+            var configureRequests = [];
+            Ros2.registerService("/mock_cm/configure_controller", "controller_manager_msgs/srv/ConfigureController", function (req2) {
+                    configureRequests.push(req2);
+                    var resp = Ros2.createEmptyServiceResponse("controller_manager_msgs/srv/ConfigureController");
+                    resp.ok = true;
+                    return resp;
+                });
+            plugin.controllerManagerInterface.transitionController("joint_state_broadcaster", ["configure"]);
+            tryVerify(function () {
+                    return configureRequests.length === 1;
+                }, 2000);
+            compare(configureRequests[0].name, "joint_state_broadcaster");
+            compare(configureRequests[0].strictness, undefined, "ConfigureController has no strictness field");
+        }
+        function test_settings_dialog() {
+            var dialog = openSettingsDialog();
+            var strictnessComboBox = find("cmSettingsStrictnessComboBox");
+            verify(strictnessComboBox, "Strictness ComboBox should be found");
+
+            // All strictness modes of the service definition must be offered.
+            compare(strictnessComboBox.count, 4, "Four strictness modes should be offered");
+            verify(indexOfStrictness(strictnessComboBox, strictnessBestEffort) !== -1, "BEST_EFFORT should be offered");
+            verify(indexOfStrictness(strictnessComboBox, strictnessStrict) !== -1, "STRICT should be offered");
+            verify(indexOfStrictness(strictnessComboBox, strictnessAuto) !== -1, "AUTO should be offered");
+            verify(indexOfStrictness(strictnessComboBox, strictnessForceAuto) !== -1, "FORCE_AUTO should be offered");
+
+            // Precondition, the initialization itself is covered by
+            // test_context_defaults.
+            compare(contextObj.switch_strictness, strictnessAuto);
+            compare(strictnessComboBox.currentValue, strictnessAuto, "Dialog should show the persisted strictness");
+            var description = find("cmSettingsStrictnessDescription");
+            verify(description, "Strictness description should be found");
+            var autoDescription = description.text;
+            verify(autoDescription.length > 0, "Strictness description should not be empty");
+
+            // Selecting another mode persists it and updates the description.
+            strictnessComboBox.currentIndex = indexOfStrictness(strictnessComboBox, strictnessForceAuto);
+            tryCompare(contextObj, "switch_strictness", strictnessForceAuto, 2000, "Selected strictness should be persisted");
+            tryVerify(function () {
+                    return description.text !== autoDescription;
+                }, 2000, "Description should follow the selected strictness");
+            var activateAsapCheckBox = find("cmSettingsActivateAsapCheckBox");
+            verify(activateAsapCheckBox, "Activate ASAP CheckBox should be found");
+            verify(!activateAsapCheckBox.checked, "Activate ASAP should be off by default");
+            mouseClick(activateAsapCheckBox);
+            tryCompare(contextObj, "activate_asap", true, 2000, "Activate ASAP should be persisted");
+            var timeoutSpinBox = find("cmSettingsTimeoutSpinBox");
+            verify(timeoutSpinBox, "Timeout SpinBox should be found");
+            compare(timeoutSpinBox.value, 0, "Timeout should default to zero");
+            timeoutSpinBox.value = 2.5;
+            tryCompare(contextObj, "switch_timeout", 2.5, 2000, "Timeout should be persisted");
+            // The displayed SpinBox has to follow as well, otherwise the write
+            // back handler would have shadowed the one of DecimalSpinBox.
+            var innerSpinBox = timeoutSpinBox.children[0];
+            verify(innerSpinBox, "DecimalSpinBox should contain a SpinBox");
+            tryCompare(innerSpinBox, "value", timeoutSpinBox.decimalToInt(2.5), 2000, "SpinBox should display the assigned value");
+
+            // Reopening the dialog re-syncs the controls with the context, even
+            // though user interaction has broken the initial bindings.
+            dialog.close();
+            tryVerify(function () {
+                    return !dialog.visible;
+                }, 2000);
+            contextObj.switch_strictness = strictnessStrict;
+            contextObj.activate_asap = false;
+            contextObj.switch_timeout = 1.5;
+            openSettingsDialog();
+            compare(strictnessComboBox.currentValue, strictnessStrict, "Reopening should show the persisted strictness");
+            compare(activateAsapCheckBox.checked, false, "Reopening should show the persisted activate_asap");
+            compare(timeoutSpinBox.value, 1.5, "Reopening should show the persisted timeout");
+        }
+        function test_switch_request_matches_service_definition() {
+            // The mock service client passes the request map through unchanged,
+            // so a plain payload assertion would only test the plugin against
+            // itself. Validate the field names against the request built from
+            // the real .srv definition instead.
+            var switchRequests = [];
+            Ros2.registerService("/mock_cm/switch_controller", "controller_manager_msgs/srv/SwitchController", function (req) {
+                    switchRequests.push(req);
+                    var resp = Ros2.createEmptyServiceResponse("controller_manager_msgs/srv/SwitchController");
+                    resp.ok = true;
+                    return resp;
+                });
+            contextObj.controller_manager_namespace = "/mock_cm";
+            var list = find("cmControllerList");
+            tryVerify(function () {
+                    return list.count >= 1;
+                }, 5000);
+            plugin.controllerManagerInterface.transitionController("joint_state_broadcaster", ["activate"]);
+            tryVerify(function () {
+                    return switchRequests.length === 1;
+                }, 2000);
+            var template = Ros2.createEmptyServiceRequest("controller_manager_msgs/srv/SwitchController");
+            verify(template, "Empty request should be created from the real service definition");
+            var sent = switchRequests[0];
+
+            // Assert the payload is actually populated first - the loops below
+            // pass vacuously on an empty request.
+            var expectedKeys = ["activate_controllers", "deactivate_controllers", "strictness", "activate_asap", "timeout"];
+            for (var e = 0; e < expectedKeys.length; ++e) {
+                verify(sent[expectedKeys[e]] !== undefined, "Request must contain '" + expectedKeys[e] + "'");
+            }
+            verify(sent.timeout.sec !== undefined && sent.timeout.nanosec !== undefined, "Request must contain a populated timeout");
+
+            // Every field that is sent has to exist in the real .srv.
+            for (var key in sent) {
+                verify(template[key] !== undefined, "Field '" + key + "' must exist in SwitchController.srv");
+            }
+            for (var durationKey in sent.timeout) {
+                verify(template.timeout[durationKey] !== undefined, "Field 'timeout." + durationKey + "' must exist in SwitchController.srv");
+            }
         }
         // Reports mock_robot in the given lifecycle state, triggers the context
         // menu entry with the given text and returns the resulting
