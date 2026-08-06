@@ -190,6 +190,7 @@ Rectangle {
 
                 Menu {
                     id: contextMenu
+                    objectName: "cmHardwareContextMenu"
                     width: {
                         let result = 0;
                         let padding = 0;
@@ -316,39 +317,39 @@ Rectangle {
                 "active": [{
                         "name": "Deactivate (inactive)",
                         "target_state": {
-                            "id": State.Inactive,
+                            "id": ControllerManager.State.Inactive,
                             "label": "inactive"
                         }
                     }, {
                         "name": "Deactivate and Cleanup (unconfigured)",
                         "target_state": {
-                            "id": State.Unconfigured,
+                            "id": ControllerManager.State.Unconfigured,
                             "label": "unconfigured"
                         }
                     },],
                 "inactive": [{
                         "name": "Activate (active)",
                         "target_state": {
-                            "id": State.Active,
+                            "id": ControllerManager.State.Active,
                             "label": "active"
                         }
                     }, {
                         "name": "Cleanup (unconfigured)",
                         "target_state": {
-                            "id": State.Unconfigured,
+                            "id": ControllerManager.State.Unconfigured,
                             "label": "unconfigured"
                         }
                     },],
                 "unconfigured": [{
                         "name": "Configure and Activate (active)",
                         "target_state": {
-                            "id": State.Active,
+                            "id": ControllerManager.State.Active,
                             "label": "active"
                         }
                     }, {
                         "name": "Configure (inactive)",
                         "target_state": {
-                            "id": State.Inactive,
+                            "id": ControllerManager.State.Inactive,
                             "label": "inactive"
                         }
                     },]

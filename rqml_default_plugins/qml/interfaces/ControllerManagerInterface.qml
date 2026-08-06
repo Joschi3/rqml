@@ -190,7 +190,7 @@ Object {
                 }
                 if (!response.ok) {
                     errorDialog.title = "Hardware Component Transition Error";
-                    errorDialog.text = "Failed to transition hardware component " + componentName + " to " + target_state + ".";
+                    errorDialog.text = "Failed to transition hardware component " + componentName + " to " + target_state.label + ".";
                     errorDialog.informativeText = "Component now in state: " + response.state.label + " (" + response.state.id + ")";
                     errorDialog.open();
                 }

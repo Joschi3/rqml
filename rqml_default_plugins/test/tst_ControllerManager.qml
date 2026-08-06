@@ -51,6 +51,12 @@ Item {
     }
     TestCase {
         id: testCase
+
+        // Constants of lifecycle_msgs/msg/State.
+        readonly property int stateActive: 3
+        readonly property int stateInactive: 2
+        readonly property int stateUnconfigured: 1
+
         function init() {
             Ros2.reset();
             contextObj.controller_manager_namespace = "";
@@ -89,6 +95,16 @@ Item {
             tryVerify(function () {
                     return pluginLoader.status === Loader.Ready;
                 });
+        }
+        // Returns the menu item with the given text or null. Separators and
+        // other item types without a text are skipped.
+        function menuItemWithText(menu, text) {
+            for (var i = 0; i < menu.count; ++i) {
+                var item = menu.itemAt(i);
+                if (item && item.text === text)
+                    return item;
+            }
+            return null;
         }
         function test_controller_transitions() {
             // Record the requests hitting switch_controller so we can assert
@@ -145,6 +161,18 @@ Item {
                 }, 5000, "Should find 1 hardware component");
             compare(list.model.get(0).name, "mock_robot");
         }
+        function test_hardware_transition_activate_from_context_menu() {
+            var request = triggerHardwareMenuEntry(stateInactive, "inactive", "Activate (active)");
+            compare(request.name, "mock_robot");
+            compare(request.target_state.label, "active");
+            compare(request.target_state.id, stateActive, "Target state id must be lifecycle_msgs PRIMARY_STATE_ACTIVE");
+        }
+        function test_hardware_transition_deactivate_from_context_menu() {
+            var request = triggerHardwareMenuEntry(stateActive, "active", "Deactivate (inactive)");
+            compare(request.name, "mock_robot");
+            compare(request.target_state.label, "inactive");
+            compare(request.target_state.id, stateInactive, "Target state id must be lifecycle_msgs PRIMARY_STATE_INACTIVE");
+        }
         function test_hardware_transitions() {
             var setStateRequests = [];
             Ros2.registerService("/mock_cm/set_hardware_component_state", "controller_manager_msgs/srv/SetHardwareComponentState", function (req) {
@@ -163,7 +191,7 @@ Item {
                     return list.count === 1;
                 }, 5000);
             plugin.controllerManagerInterface.transitionHardwareComponent("mock_robot", {
-                    "id": 2,
+                    "id": stateInactive,
                     "label": "inactive"
                 });
             tryVerify(function () {
@@ -171,7 +199,7 @@ Item {
                 }, 2000);
             compare(setStateRequests[0].name, "mock_robot");
             compare(setStateRequests[0].target_state.label, "inactive");
-            compare(setStateRequests[0].target_state.id, 2);
+            compare(setStateRequests[0].target_state.id, stateInactive);
         }
         function test_info_dialogs() {
             contextObj.controller_manager_namespace = "/mock_cm";
@@ -265,6 +293,57 @@ Item {
             var names = [list.model.get(0).name, list.model.get(1).name];
             verify(names.indexOf("joint_state_broadcaster") !== -1);
             verify(names.indexOf("arm_controller") !== -1);
+        }
+        // Reports mock_robot in the given lifecycle state, triggers the context
+        // menu entry with the given text and returns the resulting
+        // set_hardware_component_state request.
+        // test_hardware_transitions drives the interface with an explicit target
+        // state, this goes through the menu so that
+        // getTransitionsForHardwareComponentState is covered as well. The plugin
+        // reloads the list after a transition, which recreates the delegate and
+        // its menu, so only one transition can be triggered per plugin instance.
+        function triggerHardwareMenuEntry(currentStateId, currentStateLabel, entry) {
+            Ros2.registerService("/mock_cm/list_hardware_components", "controller_manager_msgs/srv/ListHardwareComponents", function (req) {
+                    var resp = Ros2.createEmptyServiceResponse("controller_manager_msgs/srv/ListHardwareComponents");
+                    var comp = Ros2.createEmptyMessage("controller_manager_msgs/msg/HardwareComponentState");
+                    comp.name = "mock_robot";
+                    comp.type = "system";
+                    comp.state = {
+                        "id": currentStateId,
+                        "label": currentStateLabel
+                    };
+                    resp.component = [comp];
+                    return resp;
+                });
+            var setStateRequests = [];
+            Ros2.registerService("/mock_cm/set_hardware_component_state", "controller_manager_msgs/srv/SetHardwareComponentState", function (req) {
+                    setStateRequests.push(req);
+                    var resp = Ros2.createEmptyServiceResponse("controller_manager_msgs/srv/SetHardwareComponentState");
+                    resp.ok = true;
+                    resp.state = {
+                        "id": currentStateId,
+                        "label": currentStateLabel
+                    };
+                    return resp;
+                });
+            contextObj.controller_manager_namespace = "/mock_cm";
+            var list = find("cmHardwareList");
+            tryVerify(function () {
+                    return list.count === 1;
+                }, 5000);
+            tryCompare(list.model.get(0).state, "label", currentStateLabel, 5000, "Component should be in the state under test");
+            list.positionViewAtIndex(0, ListView.Beginning);
+            var menu = null;
+            tryVerify(function () {
+                    var delegateItem = list.itemAtIndex(0);
+                    menu = delegateItem ? helpers.findChild(delegateItem, "cmHardwareContextMenu") : null;
+                    return menu !== null && menuItemWithText(menu, entry) !== null;
+                }, 5000, "Context menu with '" + entry + "' should be available");
+            menuItemWithText(menu, entry).triggered();
+            tryVerify(function () {
+                    return setStateRequests.length === 1;
+                }, 2000, "Menu item must send one set_hardware_component_state request");
+            return setStateRequests[0];
         }
 
         name: "ControllerManagerTest"
