@@ -147,6 +147,39 @@ Item {
             verify(contextObj.activate_asap !== undefined, "activate_asap must be defined, not just falsy");
             verify(contextObj.switch_timeout !== undefined, "switch_timeout must be defined, not just falsy");
         }
+        function test_controller_menu_entry_can_be_used_repeatedly() {
+            // transitionController consumes the action list it is handed. If
+            // that list is the one inside the menu model, the entry works only
+            // once.
+            var switchRequests = [];
+            Ros2.registerService("/mock_cm/switch_controller", "controller_manager_msgs/srv/SwitchController", function (req) {
+                    switchRequests.push(req);
+                    var resp = Ros2.createEmptyServiceResponse("controller_manager_msgs/srv/SwitchController");
+                    resp.ok = true;
+                    return resp;
+                });
+            contextObj.controller_manager_namespace = "/mock_cm";
+            var list = find("cmControllerList");
+            tryVerify(function () {
+                    return list.count >= 1;
+                }, 5000);
+            list.positionViewAtIndex(0, ListView.Beginning);
+            var menu = null;
+            tryVerify(function () {
+                    var delegateItem = list.itemAtIndex(0);
+                    menu = delegateItem ? helpers.findChild(delegateItem, "cmControllerContextMenu") : null;
+                    return menu !== null && menuItemWithText(menu, "Deactivate (inactive)") !== null;
+                }, 5000, "Controller context menu should be available");
+            menuItemWithText(menu, "Deactivate (inactive)").triggered();
+            tryVerify(function () {
+                    return switchRequests.length === 1;
+                }, 2000, "First use of the menu entry must send a request");
+            menuItemWithText(menu, "Deactivate (inactive)").triggered();
+            tryVerify(function () {
+                    return switchRequests.length === 2;
+                }, 2000, "The menu entry must still work the second time");
+            compare(switchRequests[1].deactivate_controllers, ["joint_state_broadcaster"]);
+        }
         function test_controller_transitions() {
             // Record the requests hitting switch_controller so we can assert
             // on the exact payload sent.

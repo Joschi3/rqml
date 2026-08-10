@@ -148,48 +148,16 @@ Object {
         root.loadControllers();
         root.loadHardwareComponents();
     }
+    // Runs the given actions in order.
     function transitionController(controllerName, actions) {
         if (!controllerName || !actions || actions.length === 0)
             return;
         if (!root.controllerManager)
             return;
-        const action = actions[0];
-        const serviceName = getTransitionServiceTopic(root.controllerManager, action);
-        let client = d.controllerTransitionServiceClients[serviceName];
-        if (client == null || client.name != serviceName) {
-            client = Ros2.createServiceClient(serviceName, getTransitionServiceType(action));
-            d.controllerTransitionServiceClients[serviceName] = client;
-        }
-        let request = {};
-        if (action == "activate" || action == "deactivate") {
-            request = {
-                "activate_controllers": action == "activate" ? [controllerName] : [],
-                "deactivate_controllers": action == "deactivate" ? [controllerName] : [],
-                "strictness": root.strictness,
-                "activate_asap": root.activateAsap,
-                "timeout": d.secondsToDuration(root.switchTimeout)
-            };
-        } else {
-            request.name = controllerName;
-        }
-        client.sendRequestAsync(request, function (response) {
-                if (!response) {
-                    Ros2.warn("ControllerManager: Failed to call service " + serviceName + ". Trying again.");
-                    transitionController(controllerName, actions);
-                    return;
-                }
-                if (!response.ok) {
-                    errorDialog.title = "Controller Transition Error";
-                    errorDialog.text = "Failed to " + action + " controller " + controllerName + ".";
-                    if (response.message) {
-                        errorDialog.informativeText = "Reason: " + response.message;
-                    }
-                    errorDialog.open();
-                    return;
-                }
-                actions.shift();
-                transitionController(controllerName, actions);
-            });
+        // Work on a copy. The caller may hand in an array it still needs, e.g.
+        // the action list of a context menu entry, which would be consumed
+        // otherwise and leave the entry usable only once.
+        d.runControllerActions(controllerName, actions.slice());
     }
     function transitionHardwareComponent(componentName, target_state) {
         if (!componentName || !target_state)
@@ -252,6 +220,48 @@ Object {
         property var parametersServiceClient: null
         property var setComponentStateServiceClient: null
 
+        // Runs the remaining actions in order, one service call each.
+        function runControllerActions(controllerName, remainingActions) {
+            const action = remainingActions[0];
+            const serviceName = root.getTransitionServiceTopic(root.controllerManager, action);
+            let client = d.controllerTransitionServiceClients[serviceName];
+            if (client == null || client.name != serviceName) {
+                client = Ros2.createServiceClient(serviceName, root.getTransitionServiceType(action));
+                d.controllerTransitionServiceClients[serviceName] = client;
+            }
+            let request = {};
+            if (action == "activate" || action == "deactivate") {
+                request = {
+                    "activate_controllers": action == "activate" ? [controllerName] : [],
+                    "deactivate_controllers": action == "deactivate" ? [controllerName] : [],
+                    "strictness": root.strictness,
+                    "activate_asap": root.activateAsap,
+                    "timeout": d.secondsToDuration(root.switchTimeout)
+                };
+            } else {
+                request.name = controllerName;
+            }
+            client.sendRequestAsync(request, function (response) {
+                    if (!response) {
+                        Ros2.warn("ControllerManager: Failed to call service " + serviceName + ". Trying again.");
+                        d.runControllerActions(controllerName, remainingActions);
+                        return;
+                    }
+                    if (!response.ok) {
+                        errorDialog.title = "Controller Transition Error";
+                        errorDialog.text = "Failed to " + action + " controller " + controllerName + ".";
+                        if (response.message) {
+                            errorDialog.informativeText = "Reason: " + response.message;
+                        }
+                        errorDialog.open();
+                        return;
+                    }
+                    remainingActions.shift();
+                    if (remainingActions.length === 0)
+                        return;
+                    d.runControllerActions(controllerName, remainingActions);
+                });
+        }
         function secondsToDuration(seconds) {
             const clamped = Math.max(0, seconds);
             let sec = Math.floor(clamped);

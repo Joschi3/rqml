@@ -105,6 +105,7 @@ Rectangle {
 
                 Menu {
                     id: contextMenu
+                    objectName: "cmControllerContextMenu"
                     width: {
                         let result = 0;
                         let padding = 0;
