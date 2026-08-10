@@ -1,5 +1,4 @@
 import QtQuick
-import QtQuick.Dialogs
 import Ros2
 import RQml.Utils
 
@@ -28,6 +27,12 @@ Object {
     // Timeout in seconds before pending controllers are aborted. Zero makes the
     // controller manager fall back to its default of 1 s.
     property real switchTimeout: 0
+
+    // Outcome of a transition
+    signal controllerTransitionFailed(string name, string action, string message)
+    signal controllerTransitionSucceeded(string name, string action, string message)
+    signal hardwareTransitionFailed(string name, string targetLabel, string currentLabel, int currentId)
+    signal hardwareTransitionSucceeded(string name, string targetLabel)
 
     function addParameterControllers() {
         if (!root.controllerManager)
@@ -148,7 +153,7 @@ Object {
         root.loadControllers();
         root.loadHardwareComponents();
     }
-    // Runs the given actions in order.
+    // Runs the given actions in order, reporting the outcome of the last one.
     function transitionController(controllerName, actions) {
         if (!controllerName || !actions || actions.length === 0)
             return;
@@ -157,7 +162,7 @@ Object {
         // Work on a copy. The caller may hand in an array it still needs, e.g.
         // the action list of a context menu entry, which would be consumed
         // otherwise and leave the entry usable only once.
-        d.runControllerActions(controllerName, actions.slice());
+        d.runControllerActions(controllerName, actions.slice(), []);
     }
     function transitionHardwareComponent(componentName, target_state) {
         if (!componentName || !target_state)
@@ -174,11 +179,10 @@ Object {
                     transitionHardwareComponent(componentName, target_state);
                     return;
                 }
-                if (!response.ok) {
-                    errorDialog.title = "Hardware Component Transition Error";
-                    errorDialog.text = "Failed to transition hardware component " + componentName + " to " + target_state.label + ".";
-                    errorDialog.informativeText = "Component now in state: " + response.state.label + " (" + response.state.id + ")";
-                    errorDialog.open();
+                if (response.ok) {
+                    root.hardwareTransitionSucceeded(componentName, target_state.label);
+                } else {
+                    root.hardwareTransitionFailed(componentName, target_state.label, response.state.label, response.state.id);
                 }
                 root.loadHardwareComponents();
             });
@@ -204,11 +208,6 @@ Object {
         root.refresh();
     }
 
-    MessageDialog {
-        id: errorDialog
-        buttons: MessageDialog.Ok
-        modality: Qt.WindowModal
-    }
     QtObject {
         id: d
 
@@ -220,8 +219,10 @@ Object {
         property var parametersServiceClient: null
         property var setComponentStateServiceClient: null
 
-        // Runs the remaining actions in order, one service call each.
-        function runControllerActions(controllerName, remainingActions) {
+        // Runs the remaining actions in order. Only the last one reports
+        // success, the collected messages of all of them are passed on because
+        // only switch_controller returns one at all.
+        function runControllerActions(controllerName, remainingActions, collectedMessages) {
             const action = remainingActions[0];
             const serviceName = root.getTransitionServiceTopic(root.controllerManager, action);
             let client = d.controllerTransitionServiceClients[serviceName];
@@ -244,22 +245,21 @@ Object {
             client.sendRequestAsync(request, function (response) {
                     if (!response) {
                         Ros2.warn("ControllerManager: Failed to call service " + serviceName + ". Trying again.");
-                        d.runControllerActions(controllerName, remainingActions);
+                        d.runControllerActions(controllerName, remainingActions, collectedMessages);
                         return;
                     }
                     if (!response.ok) {
-                        errorDialog.title = "Controller Transition Error";
-                        errorDialog.text = "Failed to " + action + " controller " + controllerName + ".";
-                        if (response.message) {
-                            errorDialog.informativeText = "Reason: " + response.message;
-                        }
-                        errorDialog.open();
+                        root.controllerTransitionFailed(controllerName, action, response.message || "");
                         return;
                     }
+                    if (response.message)
+                        collectedMessages.push(response.message);
                     remainingActions.shift();
-                    if (remainingActions.length === 0)
+                    if (remainingActions.length === 0) {
+                        root.controllerTransitionSucceeded(controllerName, action, collectedMessages.join("; "));
                         return;
-                    d.runControllerActions(controllerName, remainingActions);
+                    }
+                    d.runControllerActions(controllerName, remainingActions, collectedMessages);
                 });
         }
         function secondsToDuration(seconds) {

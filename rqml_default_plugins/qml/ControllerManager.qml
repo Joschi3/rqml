@@ -287,6 +287,11 @@ Rectangle {
         objectName: "cmSettingsDialog"
         settings: context
     }
+    ToastManager {
+        id: toastManager
+        objectName: "cmToastManager"
+        z: 100
+    }
     QtObject {
         id: d
 
@@ -295,10 +300,60 @@ Rectangle {
             controllerManager: context.controller_manager_namespace || ""
             strictness: context.switch_strictness ?? ControllerManagerInterface.Strictness.Auto
             switchTimeout: context.switch_timeout ?? 0
+
+            onControllerTransitionFailed: (name, action, message) => {
+                toastManager.show(d.controllerFailureMessage(action, name, message), "error");
+            }
+            onControllerTransitionSucceeded: (name, action, message) => {
+                // The message of a switch_controller call names the controllers
+                // the controller manager (de)activated on its own, which is the
+                // whole point of the AUTO and FORCE_AUTO strictness modes.
+                toastManager.show(d.controllerSuccessMessage(action, name, message), "success");
+            }
+            onHardwareTransitionFailed: (name, targetLabel, currentLabel, currentId) => {
+                toastManager.show(d.hardwareFailureMessage(name, targetLabel, currentLabel, currentId), "error");
+            }
+            onHardwareTransitionSucceeded: (name, targetLabel) => {
+                toastManager.show(qsTr("%1 is now %2").arg(name).arg(targetLabel), "success");
+            }
         }
         property var controllerManagers: []
         property var trajectoryClient: null
 
+        // The transition messages are spelled out per action instead of being
+        // composed from a verb and a sentence frame so that translators get a
+        // complete sentence. %1 is the controller, %2 the message reported by
+        // the controller manager.
+        function controllerFailureMessage(action, name, message) {
+            switch (action) {
+            case "activate":
+                return message ? qsTr("Failed to activate %1: %2").arg(name).arg(message) : qsTr("Failed to activate %1").arg(name);
+            case "deactivate":
+                return message ? qsTr("Failed to deactivate %1: %2").arg(name).arg(message) : qsTr("Failed to deactivate %1").arg(name);
+            case "configure":
+                return message ? qsTr("Failed to configure %1: %2").arg(name).arg(message) : qsTr("Failed to configure %1").arg(name);
+            case "load":
+                return message ? qsTr("Failed to load %1: %2").arg(name).arg(message) : qsTr("Failed to load %1").arg(name);
+            case "unload":
+                return message ? qsTr("Failed to unload %1: %2").arg(name).arg(message) : qsTr("Failed to unload %1").arg(name);
+            }
+            return message ? qsTr("Failed to transition %1: %2").arg(name).arg(message) : qsTr("Failed to transition %1").arg(name);
+        }
+        function controllerSuccessMessage(action, name, message) {
+            switch (action) {
+            case "activate":
+                return message ? qsTr("Activated %1: %2").arg(name).arg(message) : qsTr("Activated %1").arg(name);
+            case "deactivate":
+                return message ? qsTr("Deactivated %1: %2").arg(name).arg(message) : qsTr("Deactivated %1").arg(name);
+            case "configure":
+                return message ? qsTr("Configured %1: %2").arg(name).arg(message) : qsTr("Configured %1").arg(name);
+            case "load":
+                return message ? qsTr("Loaded %1: %2").arg(name).arg(message) : qsTr("Loaded %1").arg(name);
+            case "unload":
+                return message ? qsTr("Unloaded %1: %2").arg(name).arg(message) : qsTr("Unloaded %1").arg(name);
+            }
+            return message ? qsTr("Transitioned %1: %2").arg(name).arg(message) : qsTr("Transitioned %1").arg(name);
+        }
         function getTransitionsForControllerState(state) {
             const transitions = {
                 "active": [{
@@ -378,6 +433,12 @@ Rectangle {
                     },]
             };
             return transitions[state] || [];
+        }
+
+        // A component that refuses a transition may not report a label, the
+        // numeric lifecycle state id is always there.
+        function hardwareFailureMessage(name, targetLabel, currentLabel, currentId) {
+            return currentLabel ? qsTr("Failed to set %1 to %2, it is now %3 (%4)").arg(name).arg(targetLabel).arg(currentLabel).arg(currentId) : qsTr("Failed to set %1 to %2, it is now in state %3").arg(name).arg(targetLabel).arg(currentId);
         }
         function refresh() {
             const prevControllerManager = context.controller_manager_namespace;

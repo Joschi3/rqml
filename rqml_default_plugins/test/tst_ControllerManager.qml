@@ -45,6 +45,9 @@ Item {
     Utils {
         id: helpers
     }
+    SignalSpy {
+        id: transitionSpy
+    }
     Loader {
         id: pluginLoader
         function reload() {
@@ -77,6 +80,8 @@ Item {
         }
         function init() {
             Ros2.reset();
+            transitionSpy.target = null;
+            transitionSpy.clear();
             contextObj.controller_manager_namespace = "";
             contextObj.switch_strictness = undefined;
             contextObj.activate_asap = undefined;
@@ -138,6 +143,15 @@ Item {
                 }, 2000, "Settings dialog should open");
             return dialog;
         }
+        // Answers switch_controller with the given outcome and message.
+        function registerSwitchController(ok, message) {
+            Ros2.registerService("/mock_cm/switch_controller", "controller_manager_msgs/srv/SwitchController", function (req) {
+                    var resp = Ros2.createEmptyServiceResponse("controller_manager_msgs/srv/SwitchController");
+                    resp.ok = ok;
+                    resp.message = message;
+                    return resp;
+                });
+        }
         function test_context_defaults() {
             // The plugin has to persist its defaults into the context so that
             // they end up in the saved configuration.
@@ -179,6 +193,76 @@ Item {
                     return switchRequests.length === 2;
                 }, 2000, "The menu entry must still work the second time");
             compare(switchRequests[1].deactivate_controllers, ["joint_state_broadcaster"]);
+        }
+        function test_controller_transition_chain_reports_once() {
+            // "Deactivate and Unload" runs two services. Only the last one may
+            // report, but the message of switch_controller must survive since
+            // unload_controller does not return one.
+            registerSwitchController(true, "Deactivated dependent controllers");
+            Ros2.registerService("/mock_cm/unload_controller", "controller_manager_msgs/srv/UnloadController", function (req) {
+                    var resp = Ros2.createEmptyServiceResponse("controller_manager_msgs/srv/UnloadController");
+                    resp.ok = true;
+                    return resp;
+                });
+            contextObj.controller_manager_namespace = "/mock_cm";
+            var list = find("cmControllerList");
+            tryVerify(function () {
+                    return list.count >= 1;
+                }, 5000);
+            transitionSpy.target = plugin.controllerManagerInterface;
+            transitionSpy.signalName = "controllerTransitionSucceeded";
+            plugin.controllerManagerInterface.transitionController("joint_state_broadcaster", ["deactivate", "unload"]);
+            transitionSpy.wait(2000);
+            wait(100); // Give a second, wrong report the chance to arrive.
+            compare(transitionSpy.count, 1, "A chain must report exactly once");
+            compare(transitionSpy.signalArguments[0][1], "unload", "The last action of the chain is reported");
+            compare(transitionSpy.signalArguments[0][2], "Deactivated dependent controllers", "The message of the earlier switch must not be lost");
+        }
+        function test_controller_transition_reports_failure() {
+            registerSwitchController(false, "Could not activate, interface already claimed");
+            contextObj.controller_manager_namespace = "/mock_cm";
+            var list = find("cmControllerList");
+            tryVerify(function () {
+                    return list.count >= 1;
+                }, 5000);
+            var toasts = find("cmToastManager");
+            verify(toasts, "Toast manager should be found");
+            compare(toasts.count, 0, "No toast before the transition");
+            transitionSpy.target = plugin.controllerManagerInterface;
+            transitionSpy.signalName = "controllerTransitionFailed";
+            plugin.controllerManagerInterface.transitionController("joint_state_broadcaster", ["activate"]);
+            transitionSpy.wait(2000);
+            compare(transitionSpy.count, 1, "Exactly one failure should be reported");
+            compare(transitionSpy.signalArguments[0][0], "joint_state_broadcaster");
+            compare(transitionSpy.signalArguments[0][1], "activate");
+            compare(transitionSpy.signalArguments[0][2], "Could not activate, interface already claimed", "The reason of the controller manager must be passed on");
+            tryCompare(toasts, "count", 1, 2000, "The failure has to be surfaced to the user");
+            compare(toastLevelAt(toasts, 0), "error", "A failed transition has to be shown as an error");
+            compare(toastMessageAt(toasts, 0), "Failed to activate joint_state_broadcaster: Could not activate, interface already claimed", "The toast has to name the action, the controller and the reason");
+        }
+        function test_controller_transition_reports_success_with_message() {
+            // A switch_controller message names the controllers the controller
+            // manager switched on its own, which is what makes FORCE_AUTO
+            // comprehensible.
+            registerSwitchController(true, "Deactivated arm_controller to free position interfaces");
+            contextObj.controller_manager_namespace = "/mock_cm";
+            var list = find("cmControllerList");
+            tryVerify(function () {
+                    return list.count >= 1;
+                }, 5000);
+            var toasts = find("cmToastManager");
+            verify(toasts, "Toast manager should be found");
+            transitionSpy.target = plugin.controllerManagerInterface;
+            transitionSpy.signalName = "controllerTransitionSucceeded";
+            plugin.controllerManagerInterface.transitionController("joint_state_broadcaster", ["activate"]);
+            transitionSpy.wait(2000);
+            compare(transitionSpy.count, 1);
+            compare(transitionSpy.signalArguments[0][0], "joint_state_broadcaster");
+            compare(transitionSpy.signalArguments[0][1], "activate");
+            compare(transitionSpy.signalArguments[0][2], "Deactivated arm_controller to free position interfaces", "The message of the controller manager must be passed on");
+            tryCompare(toasts, "count", 1, 2000, "The success has to be surfaced to the user");
+            compare(toastLevelAt(toasts, 0), "success", "A successful transition has to be shown as a success, not as a plain info");
+            compare(toastMessageAt(toasts, 0), "Activated joint_state_broadcaster: Deactivated arm_controller to free position interfaces", "The toast has to report the action in past tense and keep the message");
         }
         function test_controller_transitions() {
             // Record the requests hitting switch_controller so we can assert
@@ -250,6 +334,55 @@ Item {
             compare(request.name, "mock_robot");
             compare(request.target_state.label, "inactive");
             compare(request.target_state.id, stateInactive, "Target state id must be lifecycle_msgs PRIMARY_STATE_INACTIVE");
+        }
+        function test_hardware_transition_reports_failure() {
+            // The component refuses and stays active.
+            Ros2.registerService("/mock_cm/set_hardware_component_state", "controller_manager_msgs/srv/SetHardwareComponentState", function (req) {
+                    var resp = Ros2.createEmptyServiceResponse("controller_manager_msgs/srv/SetHardwareComponentState");
+                    resp.ok = false;
+                    resp.state = {
+                        "id": stateActive,
+                        "label": "active"
+                    };
+                    return resp;
+                });
+            contextObj.controller_manager_namespace = "/mock_cm";
+            var list = find("cmHardwareList");
+            tryVerify(function () {
+                    return list.count === 1;
+                }, 5000);
+            var toasts = find("cmToastManager");
+            verify(toasts, "Toast manager should be found");
+            transitionSpy.target = plugin.controllerManagerInterface;
+            transitionSpy.signalName = "hardwareTransitionFailed";
+            plugin.controllerManagerInterface.transitionHardwareComponent("mock_robot", {
+                    "id": stateInactive,
+                    "label": "inactive"
+                });
+            transitionSpy.wait(2000);
+            compare(transitionSpy.count, 1);
+            compare(transitionSpy.signalArguments[0][0], "mock_robot");
+            compare(transitionSpy.signalArguments[0][1], "inactive", "The requested state is reported");
+            compare(transitionSpy.signalArguments[0][2], "active", "The state the component actually is in is reported");
+            compare(transitionSpy.signalArguments[0][3], stateActive, "The id of that state is reported as well, it is the only part a component always fills in");
+            tryCompare(toasts, "count", 1, 2000, "The failure has to be surfaced to the user");
+            compare(toastLevelAt(toasts, 0), "error", "A failed hardware transition has to be shown as an error");
+            compare(toastMessageAt(toasts, 0), "Failed to set mock_robot to inactive, it is now active (" + stateActive + ")", "The toast has to name the requested and the actual state");
+        }
+        function test_hardware_transition_reports_success() {
+            var toasts = find("cmToastManager");
+            verify(toasts, "Toast manager should be found");
+            transitionSpy.target = plugin.controllerManagerInterface;
+            transitionSpy.signalName = "hardwareTransitionSucceeded";
+            var request = triggerHardwareMenuEntry(stateActive, "active", "Deactivate (inactive)");
+            compare(request.name, "mock_robot");
+            transitionSpy.wait(2000);
+            compare(transitionSpy.count, 1);
+            compare(transitionSpy.signalArguments[0][0], "mock_robot");
+            compare(transitionSpy.signalArguments[0][1], "inactive", "The reached state is reported");
+            tryCompare(toasts, "count", 1, 2000, "The hardware transition has to be surfaced to the user");
+            compare(toastLevelAt(toasts, 0), "success", "A successful hardware transition has to be shown as a success");
+            compare(toastMessageAt(toasts, 0), "mock_robot is now inactive", "The toast has to name the component and the state it reached");
         }
         function test_hardware_transitions() {
             var setStateRequests = [];
@@ -521,6 +654,17 @@ Item {
                 verify(template.timeout[durationKey] !== undefined, "Field 'timeout." + durationKey + "' must exist in SwitchController.srv");
             }
         }
+        // Level of the toast at the given index. An unknown level is rendered
+        // like an info toast, so it has to be asserted explicitly.
+        function toastLevelAt(toastManager, index) {
+            var toast = toastManager.getToast(index);
+            return toast ? toast.level : "";
+        }
+        // Message of the toast at the given index.
+        function toastMessageAt(toastManager, index) {
+            var toast = toastManager.getToast(index);
+            return toast ? toast.message : "";
+        }
         // Reports mock_robot in the given lifecycle state, triggers the context
         // menu entry with the given text and returns the resulting
         // set_hardware_component_state request.
@@ -547,10 +691,8 @@ Item {
                     setStateRequests.push(req);
                     var resp = Ros2.createEmptyServiceResponse("controller_manager_msgs/srv/SetHardwareComponentState");
                     resp.ok = true;
-                    resp.state = {
-                        "id": currentStateId,
-                        "label": currentStateLabel
-                    };
+                    // A successful transition reports the state that was reached.
+                    resp.state = req.target_state;
                     return resp;
                 });
             contextObj.controller_manager_namespace = "/mock_cm";
