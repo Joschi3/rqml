@@ -49,7 +49,7 @@ Item {
         function findDelegateCloseButton(item) {
             if (!item)
                 return null;
-            if (item.text === "\u2715" && item.clicked !== undefined)
+            if (item.text === IconFont.iconClose && item.clicked !== undefined)
                 return item;
             var children = item.children || [];
             for (var i = 0; i < children.length; ++i) {
@@ -175,15 +175,19 @@ Item {
             var infoColor = toastManager.getToastColor("info");
             var warningColor = toastManager.getToastColor("warning");
             var errorColor = toastManager.getToastColor("error");
+            var successColor = toastManager.getToastColor("success");
             compare(errorColor, Material.color(Material.Red, Material.Shade800), "Error toast should be red");
             compare(warningColor, Material.color(Material.Orange, Material.Shade800), "Warning toast should be orange");
+            compare(successColor, Material.color(Material.Green, Material.Shade800), "Success toast should be green");
             compare(infoColor, Material.color(Material.BlueGrey, Material.Shade800), "Info toast should be blue-grey");
         }
         function test_toastLevelIcons() {
             compare(toastManager.getToastIcon("error"), IconFont.iconError);
             compare(toastManager.getToastIcon("warning"), IconFont.iconWarning);
+            compare(toastManager.getToastIcon("success"), IconFont.iconSuccess);
             compare(toastManager.getToastIcon("info"), IconFont.iconInfo);
             compare(toastManager.getToastIcon("bogus"), IconFont.iconInfo, "unknown levels should fall back to info icon");
+            verify(IconFont.iconSuccess !== IconFont.iconInfo, "Success has to have its own icon");
         }
         function test_uniqueToastIds() {
             toastManager.show("Toast A", "info");

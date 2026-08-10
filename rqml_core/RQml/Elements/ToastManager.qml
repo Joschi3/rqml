@@ -44,6 +44,8 @@ Item {
             return Material.color(Material.Red, Material.Shade800);
         case "warning":
             return Material.color(Material.Orange, Material.Shade800);
+        case "success":
+            return Material.color(Material.Green, Material.Shade800);
         default:
             return Material.color(Material.BlueGrey, Material.Shade800);
         }
@@ -54,6 +56,8 @@ Item {
             return IconFont.iconError;
         case "warning":
             return IconFont.iconWarning;
+        case "success":
+            return IconFont.iconSuccess;
         default:
             return IconFont.iconInfo;
         }
@@ -154,7 +158,7 @@ Item {
                     Layout.alignment: Qt.AlignVCenter
                     flat: true
                     radius: width / 2
-                    text: "\u2715"
+                    text: IconFont.iconClose
 
                     onClicked: root.removeToastById(toastItemDelegate.toastId)
                 }
