@@ -1,7 +1,9 @@
 import QtQuick
 import QtQuick.Controls
+import QtQuick.Controls.Material
 import QtQuick.Layouts
 import RQml.Elements
+import RQml.Fonts
 import "../interfaces"
 
 Dialog {
@@ -34,11 +36,11 @@ Dialog {
         readonly property var strictnessOptions: [{
                 "label": qsTr("BEST_EFFORT"),
                 "value": ControllerManagerInterface.Strictness.BestEffort,
-                "description": qsTr("Skips transitions that are not necessary and never aborts on failure. A controller that cannot be switched is dropped from the request, so a switch that did nothing is still reported as successful.")
+                "description": qsTr("Skips transitions that are not necessary and never aborts on failure.")
             }, {
                 "label": qsTr("STRICT"),
                 "value": ControllerManagerInterface.Strictness.Strict,
-                "description": qsTr("Aborts the entire switch and reports an error if anything goes wrong: an unknown controller name, a controller that failed to activate, or a controller that is already in the requested state.")
+                "description": qsTr("Aborts the entire switch and reports an error if anything goes wrong.")
             }, {
                 "label": qsTr("AUTO"),
                 "value": ControllerManagerInterface.Strictness.Auto,
@@ -46,7 +48,7 @@ Dialog {
             }, {
                 "label": qsTr("FORCE_AUTO"),
                 "value": ControllerManagerInterface.Strictness.ForceAuto,
-                "description": qsTr("Like AUTO, but also deactivates any running controller that blocks the requested activation by claiming a conflicting interface - you do not have to list them yourself. Once resolved, the switch is strict: it fails and reports an error if it cannot be performed.")
+                "description": qsTr("Like AUTO, but also deactivates any running controller that blocks the requested activation by claiming a conflicting interface.")
             }]
         readonly property real switchTimeout: root.settings?.switch_timeout ?? 0
 
@@ -93,10 +95,23 @@ Dialog {
             objectName: "cmSettingsStrictnessDescription"
             text: d.strictnessOptions[d.indexOfStrictness(d.strictness)].description
         }
-        Hint {
+        RowLayout {
             Layout.fillWidth: true
-            text: qsTr("AUTO and FORCE_AUTO require a controller_manager that implements them. Older versions accept the request but fall back to their default behaviour.")
+            objectName: "cmSettingsStrictnessWarning"
+            spacing: 8
             visible: d.strictness === ControllerManagerInterface.Strictness.Auto || d.strictness === ControllerManagerInterface.Strictness.ForceAuto
+
+            Text {
+                Layout.alignment: Qt.AlignTop
+                color: Material.color(Material.Orange)
+                font.family: IconFont.name
+                text: IconFont.iconWarning
+            }
+            Hint {
+                Layout.fillWidth: true
+                Layout.preferredHeight: contentHeight
+                text: qsTr("AUTO and FORCE_AUTO are not implemented by the official controller_manager as of 4.45 (08/2026). It accepts the request and behaves like BEST_EFFORT.")
+            }
         }
         CheckBox {
             id: activateAsapCheckBox
