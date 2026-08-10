@@ -170,7 +170,7 @@ Object {
         };
         d.setComponentStateServiceClient.sendRequestAsync(request, function (response) {
                 if (!response) {
-                    Ros2.warn("ControllerManager: Failed to call service " + serviceName + ". Trying again.");
+                    Ros2.warn("ControllerManager: Failed to call service " + root.controllerManager + "/set_hardware_component_state. Trying again.");
                     transitionHardwareComponent(componentName, target_state);
                     return;
                 }
